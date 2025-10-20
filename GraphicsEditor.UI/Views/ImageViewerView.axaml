@@ -1,0 +1,158 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:vm="using:GraphicsEditor.UI.ViewModels"
+             mc:Ignorable="d" d:DesignWidth="1200" d:DesignHeight="800"
+             x:Class="GraphicsEditor.UI.Views.ImageViewerView"
+             x:DataType="vm:ImageViewerViewModel">
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- Toolbar -->
+        <Border Grid.Row="0" Background="LightGray" Padding="10" BorderBrush="Gray" BorderThickness="0,0,0,1" Name="Toolbar">
+            <WrapPanel>
+                <Button Name="LoadImageButton" Content="Load Image" Margin="5" Padding="10,5" Click="LoadImageButton_Click"/>
+                <Button Name="SaveImageButton" Content="Save as JPEG" Margin="5" Padding="10,5" Click="SaveImageButton_Click" IsEnabled="{Binding IsImageLoaded}"/>
+                <Separator Width="20"/>
+                <Button Content="Zoom In" Margin="5" Command="{Binding ZoomInCommand}" IsEnabled="{Binding IsImageLoaded}"/>
+                <Button Content="Zoom Out" Margin="5" Command="{Binding ZoomOutCommand}" IsEnabled="{Binding IsImageLoaded}"/>
+                <Button Content="Reset Zoom" Margin="5" Command="{Binding ResetZoomCommand}" IsEnabled="{Binding IsImageLoaded}"/>
+                <Separator Width="20" IsVisible="{Binding IsImageLoaded}"/>
+                <TextBlock Text="Zoom:" VerticalAlignment="Center" Margin="5,0" IsVisible="{Binding IsImageLoaded}"/>
+                <NumericUpDown Width="100" 
+                               Minimum="0.1" 
+                               Maximum="500" 
+                               Value="{Binding ZoomLevel}"
+                               Increment="1"
+                               FormatString="F1"
+                               ClipValueToMinMax="True"
+                               AllowSpin="True"
+                               ShowButtonSpinner="True"
+                               VerticalAlignment="Center"
+                               IsVisible="{Binding IsImageLoaded}"/>
+                <TextBlock Text="x" VerticalAlignment="Center" Margin="2,0,5,0" IsVisible="{Binding IsImageLoaded}"/>
+                <TextBlock Text="(0.1x - 500x)" VerticalAlignment="Center" Margin="0,0,5,0" FontSize="11" Foreground="Gray" IsVisible="{Binding IsImageLoaded}"/>
+                <Separator Width="20" IsVisible="{Binding IsImageLoaded}"/>
+                <CheckBox Name="ShowRgbValuesCheckBox" Content="Show RGB Values" Margin="5" VerticalAlignment="Center" 
+                          IsChecked="True" ToolTip.Tip="Display R,G,B values on each pixel when pixels are at least 30px on screen (auto-adjusts with zoom)"
+                          Click="ShowRgbValuesCheckBox_Click"
+                          IsVisible="{Binding IsImageLoaded}"/>
+                <Separator Width="20" IsVisible="{Binding IsImageLoaded}"/>
+                <TextBlock Text="JPEG Quality (Live Preview):" VerticalAlignment="Center" Margin="10,0" FontWeight="SemiBold" IsVisible="{Binding IsImageLoaded}"/>
+                <Slider Width="150" Minimum="1" Maximum="100" Value="{Binding JpegQuality}" 
+                        TickFrequency="1" IsSnapToTickEnabled="True" VerticalAlignment="Center"
+                        ToolTip.Tip="Adjust to see compression artifacts in real-time. Original shown at 100%."
+                        IsVisible="{Binding IsImageLoaded}"/>
+                <TextBlock Text="{Binding JpegQuality}" VerticalAlignment="Center" Margin="5,0" Width="30" IsVisible="{Binding IsImageLoaded}"/>
+                <TextBlock Text="%" VerticalAlignment="Center" IsVisible="{Binding IsImageLoaded}"/>
+            </WrapPanel>
+        </Border>
+
+        <!-- Image Display Area -->
+        <Grid Grid.Row="1">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="250"/>
+            </Grid.ColumnDefinitions>
+
+            <!-- Image Viewer -->
+            <Border Grid.Column="0" Background="DarkGray" Margin="5">
+                <ScrollViewer Name="ImageScrollViewer" 
+                              HorizontalScrollBarVisibility="Auto" 
+                              VerticalScrollBarVisibility="Auto">
+                    <Border Name="CanvasContainer">
+                        <Canvas Name="ImageCanvas" 
+                                Background="White" 
+                                PointerPressed="ImageCanvas_OnPointerPressed"
+                                PointerMoved="ImageCanvas_OnPointerMoved"
+                                PointerReleased="ImageCanvas_OnPointerReleased"
+                                PointerWheelChanged="ImageCanvas_OnPointerWheelChanged">
+                            <Canvas.RenderTransform>
+                                <ScaleTransform ScaleX="1" ScaleY="1" />
+                            </Canvas.RenderTransform>
+                            <TextBlock Canvas.Left="300" Canvas.Top="280"
+                                       Name="PlaceholderText"
+                                       Text="Load an image to display" 
+                                       FontSize="16"
+                                       Foreground="Gray"/>
+                        </Canvas>
+                    </Border>
+                </ScrollViewer>
+            </Border>
+
+            <!-- Info Panel -->
+            <StackPanel Grid.Column="1" Margin="10" Spacing="10">
+                <TextBlock Text="Image Information" FontSize="16" FontWeight="Bold"/>
+                
+                <Border BorderBrush="Gray" BorderThickness="1" CornerRadius="4">
+                    <DockPanel>
+                        <TextBlock DockPanel.Dock="Top" Text="Image Details" FontWeight="Bold" Margin="8,4" Background="#F0F0F0"/>
+                        <StackPanel Spacing="5" Margin="8">
+                            <TextBlock>
+                                <Run Text="Width: "/>
+                                <Run Text="{Binding ImageWidth}"/>
+                                <Run Text=" px"/>
+                            </TextBlock>
+                            <TextBlock>
+                                <Run Text="Height: "/>
+                                <Run Text="{Binding ImageHeight}"/>
+                                <Run Text=" px"/>
+                            </TextBlock>
+                            <TextBlock>
+                                <Run Text="Zoom: "/>
+                                <Run Text="{Binding ZoomLevel, StringFormat={}{0:F2}}"/>
+                                <Run Text="x"/>
+                            </TextBlock>
+                        </StackPanel>
+                    </DockPanel>
+                </Border>
+
+                <Border BorderBrush="Gray" BorderThickness="1" CornerRadius="4">
+                    <DockPanel>
+                        <TextBlock DockPanel.Dock="Top" Text="Pixel Inspector" FontWeight="Bold" Margin="8,4" Background="#F0F0F0"/>
+                        <StackPanel Spacing="5" Margin="8">
+                            <TextBlock Text="{Binding PixelInfo}" TextWrapping="Wrap"/>
+                            <Border Height="60" BorderBrush="Black" BorderThickness="1" Margin="0,5,0,0">
+                                <Border.Background>
+                                    <SolidColorBrush Color="Transparent"/>
+                                    <!-- Will show selected pixel color -->
+                                </Border.Background>
+                            </Border>
+                        </StackPanel>
+                    </DockPanel>
+                </Border>
+
+                <Border BorderBrush="Gray" BorderThickness="1" CornerRadius="4">
+                    <DockPanel>
+                        <TextBlock DockPanel.Dock="Top" Text="Instructions" FontWeight="Bold" Margin="8,4" Background="#F0F0F0"/>
+                        <StackPanel Spacing="3" Margin="8">
+                            <TextBlock Text="• Click Load Image to open a file" TextWrapping="Wrap"/>
+                            <TextBlock Text="• Use zoom buttons or mouse wheel" TextWrapping="Wrap"/>
+                            <TextBlock Text="• Click on image to inspect pixel" TextWrapping="Wrap"/>
+                            <TextBlock Text="• Drag to pan when zoomed" TextWrapping="Wrap"/>
+                            <TextBlock Text="• Adjust quality before saving JPEG" TextWrapping="Wrap"/>
+                        </StackPanel>
+                    </DockPanel>
+                </Border>
+            </StackPanel>
+        </Grid>
+
+        <!-- Status Bar -->
+        <Border Grid.Row="2" Background="LightGray" Padding="10" BorderBrush="Gray" BorderThickness="0,1,0,0">
+            <DockPanel>
+                <Button DockPanel.Dock="Right" Content="Copy Error" Margin="10,0,0,0" Padding="8,4" 
+                        IsVisible="{Binding ErrorMessage, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
+                        Click="CopyError_Click"
+                        ToolTip.Tip="Copy error message to clipboard"/>
+                <TextBlock Text="{Binding ErrorMessage, TargetNullValue={Binding StatusMessage}}" TextWrapping="Wrap" VerticalAlignment="Center"/>
+            </DockPanel>
+        </Border>
+    </Grid>
+
+</UserControl>

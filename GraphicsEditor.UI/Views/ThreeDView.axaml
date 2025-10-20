@@ -1,0 +1,174 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:vm="using:GraphicsEditor.UI.ViewModels"
+             mc:Ignorable="d" d:DesignWidth="1200" d:DesignHeight="800"
+             x:Class="GraphicsEditor.UI.Views.ThreeDView"
+             x:DataType="vm:ThreeDViewModel">
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- Toolbar -->
+        <Border Grid.Row="0" Background="LightGray" Padding="10" BorderBrush="Gray" BorderThickness="0,0,0,1">
+            <WrapPanel>
+                <TextBlock Text="Rotation Controls:" VerticalAlignment="Center" Margin="10,0" FontWeight="SemiBold"/>
+                <Button Content="◀ Left" Margin="5" Command="{Binding RotateLeftCommand}"/>
+                <Button Content="Right ▶" Margin="5" Command="{Binding RotateRightCommand}"/>
+                <Button Content="▲ Up" Margin="5" Command="{Binding RotateUpCommand}"/>
+                <Button Content="Down ▼" Margin="5" Command="{Binding RotateDownCommand}"/>
+                <Button Content="Reset" Margin="5" Command="{Binding ResetRotationCommand}"/>
+                <Separator Width="20"/>
+                <CheckBox Content="Show Cross-Section" IsChecked="{Binding ShowCrossSection}" 
+                          VerticalAlignment="Center" Margin="10,0"/>
+            </WrapPanel>
+        </Border>
+
+        <!-- 3D Visualization Area -->
+        <Grid Grid.Row="1">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="300"/>
+            </Grid.ColumnDefinitions>
+
+            <!-- 3D Rendering Canvas -->
+            <Border Grid.Column="0" Background="Black" Margin="5">
+                <Canvas Name="RgbCubeCanvas" 
+                        Background="#222222"
+                        PointerPressed="Display3DCanvas_OnPointerPressed"
+                        PointerMoved="Display3DCanvas_OnPointerMoved"
+                        PointerReleased="Display3DCanvas_OnPointerReleased"
+                        Cursor="Hand">
+                    <!-- RGB Cube will be rendered here -->
+                    <TextBlock Text="RGB Cube Visualization" 
+                               Canvas.Left="20" 
+                               Canvas.Top="20"
+                               Foreground="White"
+                               FontSize="18"/>
+                    <TextBlock Text="Use rotation controls above or drag with mouse" 
+                               Canvas.Left="20" 
+                               Canvas.Top="50"
+                               Foreground="LightGray"
+                               FontSize="12"/>
+                </Canvas>
+            </Border>
+
+            <!-- Control Panel -->
+            <StackPanel Grid.Column="1" Margin="10" Spacing="15">
+                <TextBlock Text="RGB Cube Controls" FontSize="18" FontWeight="Bold"/>
+
+                <!-- Rotation Display -->
+                <Border BorderBrush="Gray" BorderThickness="1" CornerRadius="4">
+                    <DockPanel>
+                        <TextBlock DockPanel.Dock="Top" Text="Current Rotation" FontWeight="Bold" Margin="8,4" Background="#F0F0F0"/>
+                        <StackPanel Spacing="5" Margin="8">
+                            <TextBlock>
+                                <Run Text="X Rotation: "/>
+                                <Run Text="{Binding RotationX, StringFormat={}{0:F0}}"/>
+                                <Run Text="°"/>
+                            </TextBlock>
+                            <TextBlock>
+                                <Run Text="Y Rotation: "/>
+                                <Run Text="{Binding RotationY, StringFormat={}{0:F0}}"/>
+                                <Run Text="°"/>
+                            </TextBlock>
+                            <TextBlock>
+                                <Run Text="Z Rotation: "/>
+                                <Run Text="{Binding RotationZ, StringFormat={}{0:F0}}"/>
+                                <Run Text="°"/>
+                            </TextBlock>
+                        </StackPanel>
+                    </DockPanel>
+                </Border>
+
+                <!-- Cross-Section Controls -->
+                <Border BorderBrush="Gray" BorderThickness="1" CornerRadius="4" IsEnabled="{Binding ShowCrossSection}">
+                    <DockPanel>
+                        <TextBlock DockPanel.Dock="Top" Text="Cross-Section Settings" FontWeight="Bold" Margin="8,4" Background="#F0F0F0"/>
+                        <StackPanel Spacing="10" Margin="8">
+                            <TextBlock Text="Slice Axis:" FontWeight="SemiBold"/>
+                            <ComboBox ItemsSource="{Binding AvailableAxes}" 
+                                      SelectedItem="{Binding SelectedAxis}"/>
+
+                            <TextBlock Text="Position:" FontWeight="SemiBold" Margin="0,10,0,0"/>
+                            <Slider Minimum="0" Maximum="1" Value="{Binding CrossSectionPosition}" 
+                                    TickFrequency="0.01" IsSnapToTickEnabled="False"/>
+                            <TextBlock Text="{Binding CrossSectionPosition, StringFormat={}{0:F2}}" 
+                                       HorizontalAlignment="Center"/>
+
+                            <Button Content="Update Cross-Section" 
+                                    Command="{Binding UpdateCrossSectionCommand}"
+                                    HorizontalAlignment="Stretch"
+                                    Margin="0,10,0,0"/>
+                        </StackPanel>
+                    </DockPanel>
+                </Border>
+
+                <!-- Legend -->
+                <Border BorderBrush="Gray" BorderThickness="1" CornerRadius="4">
+                    <DockPanel>
+                        <TextBlock DockPanel.Dock="Top" Text="RGB Cube Vertices" FontWeight="Bold" Margin="8,4" Background="#F0F0F0"/>
+                        <StackPanel Spacing="3" Margin="8">
+                            <Grid ColumnDefinitions="20,*">
+                                <Border Grid.Column="0" Width="16" Height="16" Background="Black" BorderBrush="White" BorderThickness="1"/>
+                                <TextBlock Grid.Column="1" Text="(0,0,0) - Black" Margin="5,0"/>
+                            </Grid>
+                            <Grid ColumnDefinitions="20,*">
+                                <Border Grid.Column="0" Width="16" Height="16" Background="Red"/>
+                                <TextBlock Grid.Column="1" Text="(1,0,0) - Red" Margin="5,0"/>
+                            </Grid>
+                            <Grid ColumnDefinitions="20,*">
+                                <Border Grid.Column="0" Width="16" Height="16" Background="Green"/>
+                                <TextBlock Grid.Column="1" Text="(0,1,0) - Green" Margin="5,0"/>
+                            </Grid>
+                            <Grid ColumnDefinitions="20,*">
+                                <Border Grid.Column="0" Width="16" Height="16" Background="Blue"/>
+                                <TextBlock Grid.Column="1" Text="(0,0,1) - Blue" Margin="5,0"/>
+                            </Grid>
+                            <Grid ColumnDefinitions="20,*">
+                                <Border Grid.Column="0" Width="16" Height="16" Background="Cyan"/>
+                                <TextBlock Grid.Column="1" Text="(0,1,1) - Cyan" Margin="5,0"/>
+                            </Grid>
+                            <Grid ColumnDefinitions="20,*">
+                                <Border Grid.Column="0" Width="16" Height="16" Background="Magenta"/>
+                                <TextBlock Grid.Column="1" Text="(1,0,1) - Magenta" Margin="5,0"/>
+                            </Grid>
+                            <Grid ColumnDefinitions="20,*">
+                                <Border Grid.Column="0" Width="16" Height="16" Background="Yellow"/>
+                                <TextBlock Grid.Column="1" Text="(1,1,0) - Yellow" Margin="5,0"/>
+                            </Grid>
+                            <Grid ColumnDefinitions="20,*">
+                                <Border Grid.Column="0" Width="16" Height="16" Background="White" BorderBrush="Black" BorderThickness="1"/>
+                                <TextBlock Grid.Column="1" Text="(1,1,1) - White" Margin="5,0"/>
+                            </Grid>
+                        </StackPanel>
+                    </DockPanel>
+                </Border>
+
+                <!-- Instructions -->
+                <Border BorderBrush="Gray" BorderThickness="1" CornerRadius="4">
+                    <DockPanel>
+                        <TextBlock DockPanel.Dock="Top" Text="Instructions" FontWeight="Bold" Margin="8,4" Background="#F0F0F0"/>
+                        <StackPanel Spacing="3" Margin="8">
+                            <TextBlock Text="• Use rotation buttons to rotate cube" TextWrapping="Wrap"/>
+                            <TextBlock Text="• Drag on canvas to rotate interactively" TextWrapping="Wrap"/>
+                            <TextBlock Text="• Enable cross-section to view a slice" TextWrapping="Wrap"/>
+                            <TextBlock Text="• Select axis and adjust position" TextWrapping="Wrap"/>
+                        </StackPanel>
+                    </DockPanel>
+                </Border>
+            </StackPanel>
+        </Grid>
+
+        <!-- Status Bar -->
+        <Border Grid.Row="2" Background="LightGray" Padding="10" BorderBrush="Gray" BorderThickness="0,1,0,0">
+            <TextBlock Text="{Binding StatusMessage}" />
+        </Border>
+    </Grid>
+
+</UserControl>

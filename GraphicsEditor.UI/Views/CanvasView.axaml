@@ -1,0 +1,223 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:vm="using:GraphicsEditor.UI.ViewModels"
+             mc:Ignorable="d" d:DesignWidth="1200" d:DesignHeight="800"
+             x:Class="GraphicsEditor.UI.Views.CanvasView"
+             x:DataType="vm:CanvasViewModel">
+
+    <Grid>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="*"/>
+            <ColumnDefinition Width="300"/>
+        </Grid.ColumnDefinitions>
+
+        <!-- Canvas Area -->
+        <Border Grid.Column="0" Background="White" BorderBrush="Gray" BorderThickness="1" Margin="5">
+            <Canvas Name="DrawingCanvas" 
+                    Background="White"
+                    PointerPressed="DrawingCanvas_OnPointerPressed"
+                    PointerMoved="DrawingCanvas_OnPointerMoved"
+                    PointerReleased="DrawingCanvas_OnPointerReleased">
+                <!-- Shapes will be rendered here programmatically or via bindings -->
+            </Canvas>
+        </Border>
+
+        <!-- Tools Panel -->
+        <ScrollViewer Grid.Column="1" VerticalScrollBarVisibility="Auto">
+            <StackPanel Margin="10" Spacing="10">
+                <TextBlock Text="Drawing Tools" FontSize="18" FontWeight="Bold"/>
+
+                <!-- Tool Selection -->
+                <Border BorderBrush="Gray" BorderThickness="1" CornerRadius="4">
+                    <DockPanel>
+                        <TextBlock DockPanel.Dock="Top" Text="Select Tool" FontWeight="Bold" Margin="8,4" Background="#F0F0F0"/>
+                        <StackPanel Spacing="5" Margin="8">
+                            <RadioButton Content="Select/Move" 
+                                         IsChecked="{Binding SelectedTool, Converter={StaticResource EnumToBoolConverter}, ConverterParameter=Select}"/>
+                            <RadioButton Content="Line" 
+                                         IsChecked="{Binding SelectedTool, Converter={StaticResource EnumToBoolConverter}, ConverterParameter=Line}"/>
+                            <RadioButton Content="Rectangle" 
+                                         IsChecked="{Binding SelectedTool, Converter={StaticResource EnumToBoolConverter}, ConverterParameter=Rectangle}"/>
+                            <RadioButton Content="Circle" 
+                                         IsChecked="{Binding SelectedTool, Converter={StaticResource EnumToBoolConverter}, ConverterParameter=Circle}"/>
+                        </StackPanel>
+                    </DockPanel>
+                </Border>
+
+                <!-- Color & Style Settings -->
+                <Border BorderBrush="Gray" BorderThickness="1" CornerRadius="4">
+                    <DockPanel>
+                        <TextBlock DockPanel.Dock="Top" Text="Color &amp; Style" FontWeight="Bold" Margin="8,4" Background="#F0F0F0"/>
+                        <StackPanel Spacing="8" Margin="8">
+                            <!-- Stroke Color -->
+                            <TextBlock Text="Stroke Color:" FontWeight="SemiBold"/>
+                            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="5">
+                                <Border Grid.Column="0" Height="30" BorderBrush="Gray" BorderThickness="1" CornerRadius="3">
+                                    <Border.Background>
+                                        <SolidColorBrush Color="{Binding CurrentStrokeColor, Converter={StaticResource UintToColorConverter}}"/>
+                                    </Border.Background>
+                                </Border>
+                                <TextBox Grid.Column="1" Width="80" Text="{Binding CurrentStrokeColor, Converter={StaticResource UintToHexConverter}}" 
+                                         Watermark="#RRGGBB"/>
+                            </Grid>
+                            
+                            <!-- Quick Color Presets for Stroke -->
+                            <WrapPanel>
+                                <Button Content="⬛" Width="30" Height="30" Margin="2" 
+                                        Command="{Binding SetStrokeColorCommand}" CommandParameter="0xFF000000" 
+                                        ToolTip.Tip="Black"/>
+                                <Button Content="⬜" Width="30" Height="30" Margin="2" 
+                                        Command="{Binding SetStrokeColorCommand}" CommandParameter="0xFFFFFFFF" 
+                                        ToolTip.Tip="White"/>
+                                <Button Content="🟥" Width="30" Height="30" Margin="2" 
+                                        Command="{Binding SetStrokeColorCommand}" CommandParameter="0xFFFF0000" 
+                                        ToolTip.Tip="Red"/>
+                                <Button Content="🟩" Width="30" Height="30" Margin="2" 
+                                        Command="{Binding SetStrokeColorCommand}" CommandParameter="0xFF00FF00" 
+                                        ToolTip.Tip="Green"/>
+                                <Button Content="🟦" Width="30" Height="30" Margin="2" 
+                                        Command="{Binding SetStrokeColorCommand}" CommandParameter="0xFF0000FF" 
+                                        ToolTip.Tip="Blue"/>
+                                <Button Content="🟨" Width="30" Height="30" Margin="2" 
+                                        Command="{Binding SetStrokeColorCommand}" CommandParameter="0xFFFFFF00" 
+                                        ToolTip.Tip="Yellow"/>
+                            </WrapPanel>
+                            
+                            <!-- Stroke Thickness -->
+                            <TextBlock Text="Stroke Thickness:" FontWeight="SemiBold" Margin="0,5,0,0"/>
+                            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="5">
+                                <Slider Grid.Column="0" Minimum="1" Maximum="10" Value="{Binding CurrentStrokeThickness}" 
+                                        TickFrequency="1" IsSnapToTickEnabled="True"/>
+                                <TextBlock Grid.Column="1" Text="{Binding CurrentStrokeThickness, StringFormat={}{0:F1}}" 
+                                           Width="30" VerticalAlignment="Center"/>
+                            </Grid>
+                            
+                            <!-- Fill Color -->
+                            <TextBlock Text="Fill Color:" FontWeight="SemiBold" Margin="0,5,0,0"/>
+                            <CheckBox Content="Enable Fill" IsChecked="{Binding HasFill}"/>
+                            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="5" IsEnabled="{Binding HasFill}">
+                                <Border Grid.Column="0" Height="30" BorderBrush="Gray" BorderThickness="1" CornerRadius="3">
+                                    <Border.Background>
+                                        <SolidColorBrush Color="{Binding CurrentFillColor, Converter={StaticResource NullableUintToColorConverter}}"/>
+                                    </Border.Background>
+                                </Border>
+                                <TextBox Grid.Column="1" Width="80" Text="{Binding CurrentFillColor, Converter={StaticResource NullableUintToHexConverter}}" 
+                                         Watermark="#RRGGBB"/>
+                            </Grid>
+                            
+                            <!-- Quick Color Presets for Fill -->
+                            <WrapPanel IsEnabled="{Binding HasFill}">
+                                <Button Content="⬜" Width="30" Height="30" Margin="2" 
+                                        Command="{Binding SetFillColorCommand}" CommandParameter="0xFFFFFFFF" 
+                                        ToolTip.Tip="White"/>
+                                <Button Content="🟥" Width="30" Height="30" Margin="2" 
+                                        Command="{Binding SetFillColorCommand}" CommandParameter="0xFFFF0000" 
+                                        ToolTip.Tip="Red"/>
+                                <Button Content="🟩" Width="30" Height="30" Margin="2" 
+                                        Command="{Binding SetFillColorCommand}" CommandParameter="0xFF00FF00" 
+                                        ToolTip.Tip="Green"/>
+                                <Button Content="🟦" Width="30" Height="30" Margin="2" 
+                                        Command="{Binding SetFillColorCommand}" CommandParameter="0xFF0000FF" 
+                                        ToolTip.Tip="Blue"/>
+                                <Button Content="🟨" Width="30" Height="30" Margin="2" 
+                                        Command="{Binding SetFillColorCommand}" CommandParameter="0xFFFFFF00" 
+                                        ToolTip.Tip="Yellow"/>
+                                <Button Content="🟪" Width="30" Height="30" Margin="2" 
+                                        Command="{Binding SetFillColorCommand}" CommandParameter="0xFFFF00FF" 
+                                        ToolTip.Tip="Magenta"/>
+                            </WrapPanel>
+                        </StackPanel>
+                    </DockPanel>
+                </Border>
+
+                <!-- Line Parameters -->
+                <Expander Header="Line Parameters" IsExpanded="True" IsVisible="{Binding IsLineSelected}">
+                    <StackPanel Spacing="5">
+                        <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto,Auto,Auto" RowSpacing="5" ColumnSpacing="5">
+                            <TextBlock Grid.Row="0" Grid.Column="0" Text="X1:" VerticalAlignment="Center"/>
+                            <TextBox Grid.Row="0" Grid.Column="1" Text="{Binding LineX1}"/>
+                            
+                            <TextBlock Grid.Row="1" Grid.Column="0" Text="Y1:" VerticalAlignment="Center"/>
+                            <TextBox Grid.Row="1" Grid.Column="1" Text="{Binding LineY1}"/>
+                            
+                            <TextBlock Grid.Row="2" Grid.Column="0" Text="X2:" VerticalAlignment="Center"/>
+                            <TextBox Grid.Row="2" Grid.Column="1" Text="{Binding LineX2}"/>
+                            
+                            <TextBlock Grid.Row="3" Grid.Column="0" Text="Y2:" VerticalAlignment="Center"/>
+                            <TextBox Grid.Row="3" Grid.Column="1" Text="{Binding LineY2}"/>
+                        </Grid>
+                        <Button Content="Add Line" Command="{Binding AddLineFromParamsCommand}" HorizontalAlignment="Stretch" Margin="0,5,0,0"/>
+                        <Button Content="Update Selected Line" Command="{Binding UpdateSelectedShapeCommand}" 
+                                HorizontalAlignment="Stretch" Margin="0,2,0,0"
+                                IsEnabled="{Binding SelectedShape, Converter={StaticResource NullToBoolConverter}}"/>
+                    </StackPanel>
+                </Expander>
+
+                <!-- Rectangle Parameters -->
+                <Expander Header="Rectangle Parameters" IsVisible="{Binding IsRectangleSelected}">
+                    <StackPanel Spacing="5">
+                        <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto,Auto,Auto" RowSpacing="5" ColumnSpacing="5">
+                            <TextBlock Grid.Row="0" Grid.Column="0" Text="X:" VerticalAlignment="Center"/>
+                            <TextBox Grid.Row="0" Grid.Column="1" Text="{Binding RectX}"/>
+                            
+                            <TextBlock Grid.Row="1" Grid.Column="0" Text="Y:" VerticalAlignment="Center"/>
+                            <TextBox Grid.Row="1" Grid.Column="1" Text="{Binding RectY}"/>
+                            
+                            <TextBlock Grid.Row="2" Grid.Column="0" Text="Width:" VerticalAlignment="Center"/>
+                            <TextBox Grid.Row="2" Grid.Column="1" Text="{Binding RectWidth}"/>
+                            
+                            <TextBlock Grid.Row="3" Grid.Column="0" Text="Height:" VerticalAlignment="Center"/>
+                            <TextBox Grid.Row="3" Grid.Column="1" Text="{Binding RectHeight}"/>
+                        </Grid>
+                        <Button Content="Add Rectangle" Command="{Binding AddRectangleFromParamsCommand}" HorizontalAlignment="Stretch" Margin="0,5,0,0"/>
+                        <Button Content="Update Selected Rectangle" Command="{Binding UpdateSelectedShapeCommand}" 
+                                HorizontalAlignment="Stretch" Margin="0,2,0,0"
+                                IsEnabled="{Binding SelectedShape, Converter={StaticResource NullToBoolConverter}}"/>
+                    </StackPanel>
+                </Expander>
+
+                <!-- Circle Parameters -->
+                <Expander Header="Circle Parameters" IsVisible="{Binding IsCircleSelected}">
+                    <StackPanel Spacing="5">
+                        <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto,Auto" RowSpacing="5" ColumnSpacing="5">
+                            <TextBlock Grid.Row="0" Grid.Column="0" Text="Center X:" VerticalAlignment="Center"/>
+                            <TextBox Grid.Row="0" Grid.Column="1" Text="{Binding CircleX}"/>
+                            
+                            <TextBlock Grid.Row="1" Grid.Column="0" Text="Center Y:" VerticalAlignment="Center"/>
+                            <TextBox Grid.Row="1" Grid.Column="1" Text="{Binding CircleY}"/>
+                            
+                            <TextBlock Grid.Row="2" Grid.Column="0" Text="Radius:" VerticalAlignment="Center"/>
+                            <TextBox Grid.Row="2" Grid.Column="1" Text="{Binding CircleRadius}"/>
+                        </Grid>
+                        <Button Content="Add Circle" Command="{Binding AddCircleFromParamsCommand}" HorizontalAlignment="Stretch" Margin="0,5,0,0"/>
+                        <Button Content="Update Selected Circle" Command="{Binding UpdateSelectedShapeCommand}" 
+                                HorizontalAlignment="Stretch" Margin="0,2,0,0"
+                                IsEnabled="{Binding SelectedShape, Converter={StaticResource NullToBoolConverter}}"/>
+                    </StackPanel>
+                </Expander>
+
+                <!-- Actions -->
+                <Border BorderBrush="Gray" BorderThickness="1" CornerRadius="4">
+                    <DockPanel>
+                        <TextBlock DockPanel.Dock="Top" Text="Actions" FontWeight="Bold" Margin="8,4" Background="#F0F0F0"/>
+                        <StackPanel Spacing="5" Margin="8">
+                            <Button Content="Delete Selected" Command="{Binding DeleteSelectedCommand}"/>
+                            <Button Content="Clear All" Command="{Binding ClearAllCommand}"/>
+                            <Separator/>
+                            <Button Content="Save Shapes" Command="{Binding SaveShapesCommand}"/>
+                            <Button Content="Load Shapes" Command="{Binding LoadShapesCommand}"/>
+                        </StackPanel>
+                    </DockPanel>
+                </Border>
+
+                <!-- Status -->
+                <TextBlock Text="{Binding StatusMessage}" 
+                           TextWrapping="Wrap"
+                           Foreground="DarkBlue"/>
+            </StackPanel>
+        </ScrollViewer>
+    </Grid>
+
+</UserControl>

@@ -1,0 +1,132 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:vm="using:GraphicsEditor.UI.ViewModels"
+             mc:Ignorable="d" d:DesignWidth="1200" d:DesignHeight="800"
+             x:Class="GraphicsEditor.UI.Views.ColorConverterView"
+             x:DataType="vm:ColorConverterViewModel">
+
+    <Grid Margin="20">
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="*"/>
+            <ColumnDefinition Width="*"/>
+        </Grid.ColumnDefinitions>
+
+        <!-- RGB Section -->
+        <StackPanel Grid.Column="0" Margin="10" Spacing="15">
+            <TextBlock Text="RGB Color" FontSize="20" FontWeight="Bold"/>
+
+            <!-- RGB Sliders -->
+            <StackPanel Spacing="10">
+                <!-- Red -->
+                <TextBlock Text="Red" FontWeight="SemiBold"/>
+                <Grid ColumnDefinitions="*,Auto">
+                    <Slider Grid.Column="0" Minimum="0" Maximum="255" Value="{Binding Red}" 
+                            TickFrequency="1" IsSnapToTickEnabled="True"/>
+                    <TextBox Grid.Column="1" Width="60" Margin="10,0,0,0" 
+                             Text="{Binding Red}" HorizontalContentAlignment="Center"/>
+                </Grid>
+
+                <!-- Green -->
+                <TextBlock Text="Green" FontWeight="SemiBold"/>
+                <Grid ColumnDefinitions="*,Auto">
+                    <Slider Grid.Column="0" Minimum="0" Maximum="255" Value="{Binding Green}" 
+                            TickFrequency="1" IsSnapToTickEnabled="True"/>
+                    <TextBox Grid.Column="1" Width="60" Margin="10,0,0,0" 
+                             Text="{Binding Green}" HorizontalContentAlignment="Center"/>
+                </Grid>
+
+                <!-- Blue -->
+                <TextBlock Text="Blue" FontWeight="SemiBold"/>
+                <Grid ColumnDefinitions="*,Auto">
+                    <Slider Grid.Column="0" Minimum="0" Maximum="255" Value="{Binding Blue}" 
+                            TickFrequency="1" IsSnapToTickEnabled="True"/>
+                    <TextBox Grid.Column="1" Width="60" Margin="10,0,0,0" 
+                             Text="{Binding Blue}" HorizontalContentAlignment="Center"/>
+                </Grid>
+            </StackPanel>
+
+            <!-- Hex Input -->
+            <StackPanel Spacing="5">
+                <TextBlock Text="Hex Color" FontWeight="SemiBold"/>
+                <Grid ColumnDefinitions="*,Auto">
+                    <TextBox Grid.Column="0" Text="{Binding HexColor}"/>
+                    <Button Grid.Column="1" Content="Apply" Margin="5,0,0,0" 
+                            Command="{Binding SetFromHexCommand}"/>
+                </Grid>
+            </StackPanel>
+
+            <!-- Preset Colors -->
+            <StackPanel Spacing="5">
+                <TextBlock Text="Preset Colors" FontWeight="SemiBold"/>
+                <WrapPanel>
+                    <Button Content="Red" Margin="2" Command="{Binding SetPresetColorCommand}" CommandParameter="Red"/>
+                    <Button Content="Green" Margin="2" Command="{Binding SetPresetColorCommand}" CommandParameter="Green"/>
+                    <Button Content="Blue" Margin="2" Command="{Binding SetPresetColorCommand}" CommandParameter="Blue"/>
+                    <Button Content="Yellow" Margin="2" Command="{Binding SetPresetColorCommand}" CommandParameter="Yellow"/>
+                    <Button Content="Cyan" Margin="2" Command="{Binding SetPresetColorCommand}" CommandParameter="Cyan"/>
+                    <Button Content="Magenta" Margin="2" Command="{Binding SetPresetColorCommand}" CommandParameter="Magenta"/>
+                    <Button Content="White" Margin="2" Command="{Binding SetPresetColorCommand}" CommandParameter="White"/>
+                    <Button Content="Black" Margin="2" Command="{Binding SetPresetColorCommand}" CommandParameter="Black"/>
+                </WrapPanel>
+            </StackPanel>
+        </StackPanel>
+
+        <!-- CMYK Section -->
+        <StackPanel Grid.Column="1" Margin="10" Spacing="15">
+            <TextBlock Text="CMYK Color" FontSize="20" FontWeight="Bold"/>
+
+            <!-- CMYK Sliders -->
+            <StackPanel Spacing="10">
+                <!-- Cyan -->
+                <TextBlock Text="Cyan (%)" FontWeight="SemiBold"/>
+                <Grid ColumnDefinitions="*,Auto">
+                    <Slider Grid.Column="0" Minimum="0" Maximum="100" Value="{Binding Cyan}" 
+                            TickFrequency="0.1" IsSnapToTickEnabled="False"/>
+                    <TextBox Grid.Column="1" Width="60" Margin="10,0,0,0" 
+                             Text="{Binding Cyan, StringFormat={}{0:F1}}" HorizontalContentAlignment="Center"/>
+                </Grid>
+
+                <!-- Magenta -->
+                <TextBlock Text="Magenta (%)" FontWeight="SemiBold"/>
+                <Grid ColumnDefinitions="*,Auto">
+                    <Slider Grid.Column="0" Minimum="0" Maximum="100" Value="{Binding Magenta}" 
+                            TickFrequency="0.1" IsSnapToTickEnabled="False"/>
+                    <TextBox Grid.Column="1" Width="60" Margin="10,0,0,0" 
+                             Text="{Binding Magenta, StringFormat={}{0:F1}}" HorizontalContentAlignment="Center"/>
+                </Grid>
+
+                <!-- Yellow -->
+                <TextBlock Text="Yellow (%)" FontWeight="SemiBold"/>
+                <Grid ColumnDefinitions="*,Auto">
+                    <Slider Grid.Column="0" Minimum="0" Maximum="100" Value="{Binding Yellow}" 
+                            TickFrequency="0.1" IsSnapToTickEnabled="False"/>
+                    <TextBox Grid.Column="1" Width="60" Margin="10,0,0,0" 
+                             Text="{Binding Yellow, StringFormat={}{0:F1}}" HorizontalContentAlignment="Center"/>
+                </Grid>
+
+                <!-- Key (Black) -->
+                <TextBlock Text="Key/Black (%)" FontWeight="SemiBold"/>
+                <Grid ColumnDefinitions="*,Auto">
+                    <Slider Grid.Column="0" Minimum="0" Maximum="100" Value="{Binding Key}" 
+                            TickFrequency="0.1" IsSnapToTickEnabled="False"/>
+                    <TextBox Grid.Column="1" Width="60" Margin="10,0,0,0" 
+                             Text="{Binding Key, StringFormat={}{0:F1}}" HorizontalContentAlignment="Center"/>
+                </Grid>
+            </StackPanel>
+
+            <!-- Color Preview -->
+            <StackPanel Spacing="5" Margin="0,20,0,0">
+                <TextBlock Text="Color Preview" FontWeight="SemiBold" FontSize="16"/>
+                <Border Height="150" BorderBrush="Black" BorderThickness="2" CornerRadius="5">
+                    <Border.Background>
+                        <SolidColorBrush Color="{Binding PreviewColor, Converter={StaticResource UintToColorConverter}}"/>
+                    </Border.Background>
+                </Border>
+                <TextBlock Text="{Binding HexColor}" HorizontalAlignment="Center" FontSize="14"/>
+            </StackPanel>
+        </StackPanel>
+    </Grid>
+
+</UserControl>

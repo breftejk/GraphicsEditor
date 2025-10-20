@@ -1,0 +1,41 @@
+## Build Folders
+bin/
+obj/
+out/
+
+## Visual Studio / Rider / VS Code
+.vs/
+.vscode/
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+.idea/
+
+## Rider
+.idea/
+
+## Resharper
+*.DotSettings.user
+
+## NuGet Packages
+*.nupkg
+packages/
+# NuGet cache folder
+*.snupkg
+
+## Avalonia / GUI specific
+*.g.cs
+*.g.i.cs
+
+## Logs
+*.log
+Logs/
+
+## OS generated files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Shapes generated during design time
+shapes.json

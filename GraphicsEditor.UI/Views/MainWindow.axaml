@@ -1,0 +1,40 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:GraphicsEditor.UI.ViewModels"
+        xmlns:views="using:GraphicsEditor.UI.Views"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        mc:Ignorable="d" d:DesignWidth="1200" d:DesignHeight="800"
+        x:Class="GraphicsEditor.UI.Views.MainWindow"
+        x:DataType="vm:MainWindowViewModel"
+        Icon="/Assets/avalonia-logo.ico"
+        Title="Graphics Editor"
+        Width="1200" Height="800">
+
+    <Design.DataContext>
+        <vm:MainWindowViewModel/>
+    </Design.DataContext>
+
+    <TabControl SelectedIndex="{Binding SelectedTabIndex}">
+        <!-- 2D Editor Tab -->
+        <TabItem Header="2D Editor">
+            <views:CanvasView DataContext="{Binding CanvasViewModel}" />
+        </TabItem>
+
+        <!-- Image Viewer Tab -->
+        <TabItem Header="Image Viewer">
+            <views:ImageViewerView DataContext="{Binding ImageViewerViewModel}" />
+        </TabItem>
+
+        <!-- Color Converter Tab -->
+        <TabItem Header="Color Converter">
+            <views:ColorConverterView DataContext="{Binding ColorConverterViewModel}" />
+        </TabItem>
+
+        <!-- 3D Visualization Tab -->
+        <TabItem Header="3D Visualization">
+            <views:ThreeDView DataContext="{Binding ThreeDViewModel}" />
+        </TabItem>
+    </TabControl>
+
+</Window>

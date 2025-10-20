@@ -1,0 +1,25 @@
+<Application xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             x:Class="GraphicsEditor.UI.App"
+             xmlns:local="using:GraphicsEditor.UI"
+             xmlns:converters="using:GraphicsEditor.UI.Converters"
+             RequestedThemeVariant="Default">
+             <!-- "Default" ThemeVariant follows system theme variant. "Dark" or "Light" are other available options. -->
+
+    <Application.Resources>
+        <converters:UintToColorConverter x:Key="UintToColorConverter"/>
+        <converters:UintToHexConverter x:Key="UintToHexConverter"/>
+        <converters:NullableUintToColorConverter x:Key="NullableUintToColorConverter"/>
+        <converters:NullableUintToHexConverter x:Key="NullableUintToHexConverter"/>
+        <converters:EnumToBoolConverter x:Key="EnumToBoolConverter"/>
+        <converters:NullToBoolConverter x:Key="NullToBoolConverter"/>
+    </Application.Resources>
+
+    <Application.DataTemplates>
+        <local:ViewLocator/>
+    </Application.DataTemplates>
+  
+    <Application.Styles>
+        <FluentTheme />
+    </Application.Styles>
+</Application>

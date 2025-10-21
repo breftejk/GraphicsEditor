@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Threading.Tasks;
 using CommunityToolkit.Mvvm.ComponentModel;
@@ -24,8 +25,15 @@ public partial class ImageViewerViewModel : ViewModelBase
     [ObservableProperty]
     private byte[]? _imageData;
     
-    // Store original image data (before JPEG compression)
+    // Store original image data (before any processing)
     private byte[]? _originalImageData;
+    
+    // Stack to store image history for undo functionality
+    private Stack<byte[]> _imageHistory = new Stack<byte[]>();
+    
+    // Can undo flag
+    [ObservableProperty]
+    private bool _canUndo = false;
 
     [ObservableProperty]
     private int _imageWidth;
@@ -69,6 +77,35 @@ public partial class ImageViewerViewModel : ViewModelBase
 
     [ObservableProperty]
     private string _errorMessage = "";
+
+    // Point transformation parameters
+    [ObservableProperty]
+    private int _addValue = 0;
+
+    [ObservableProperty]
+    private int _subtractValue = 0;
+
+    [ObservableProperty]
+    private double _multiplyValue = 1.0;
+
+    [ObservableProperty]
+    private double _divideValue = 1.0;
+
+    [ObservableProperty]
+    private int _brightnessLevel = 0;
+
+    // Filter parameters
+    [ObservableProperty]
+    private int _smoothingKernelSize = 3;
+
+    [ObservableProperty]
+    private int _medianKernelSize = 3;
+
+    [ObservableProperty]
+    private double _gaussianSigma = 1.0;
+
+    [ObservableProperty]
+    private string _customKernelInput = "0,-1,0\n-1,5,-1\n0,-1,0";
 
     public ImageViewerViewModel()
     {
@@ -197,6 +234,13 @@ public partial class ImageViewerViewModel : ViewModelBase
             LoadedFilePath = filePath;
             ZoomLevel = 1.0;
             IsImageLoaded = true;
+            
+            // Reset history and filters
+            _imageHistory.Clear();
+            CanUndo = false;
+            
+            // Reset all filters and transformations to default values
+            ResetAllFiltersAndTransformations();
         }
         catch (Exception ex)
         {
@@ -209,8 +253,8 @@ public partial class ImageViewerViewModel : ViewModelBase
     [RelayCommand]
     private void SaveImageAsJpeg(string filePath)
     {
-        // Always save from original data, not the preview
-        var dataToSave = _originalImageData ?? ImageData;
+        // Save the current (possibly processed) image data
+        var dataToSave = ImageData;
         
         if (dataToSave == null)
         {
@@ -278,4 +322,367 @@ public partial class ImageViewerViewModel : ViewModelBase
     {
         _imageService.Pan(deltaX, deltaY);
     }
+
+    // ============================================
+    // POINT TRANSFORMATIONS
+    // ============================================
+
+    [RelayCommand]
+    private void ApplyAdd()
+    {
+        if (!IsImageLoaded || ImageData == null) return;
+        
+        try
+        {
+            // Apply to current image (stack operation)
+            _imageService.LoadImage(ImageData, ImageWidth, ImageHeight);
+            var result = _imageService.AddValue(AddValue);
+            ApplyProcessedImage(result, $"Add: {AddValue}");
+        }
+        catch (Exception ex)
+        {
+            StatusMessage = $"Error: {ex.Message}";
+        }
+    }
+
+    [RelayCommand]
+    private void ApplySubtract()
+    {
+        if (!IsImageLoaded || ImageData == null) return;
+        
+        try
+        {
+            // Apply to current image (stack operation)
+            _imageService.LoadImage(ImageData, ImageWidth, ImageHeight);
+            var result = _imageService.SubtractValue(SubtractValue);
+            ApplyProcessedImage(result, $"Subtract: {SubtractValue}");
+        }
+        catch (Exception ex)
+        {
+            StatusMessage = $"Error: {ex.Message}";
+        }
+    }
+
+    [RelayCommand]
+    private void ApplyMultiply()
+    {
+        if (!IsImageLoaded || ImageData == null) return;
+        
+        try
+        {
+            // Apply to current image (stack operation)
+            _imageService.LoadImage(ImageData, ImageWidth, ImageHeight);
+            var result = _imageService.MultiplyValue(MultiplyValue);
+            ApplyProcessedImage(result, $"Multiply: {MultiplyValue:F2}");
+        }
+        catch (Exception ex)
+        {
+            StatusMessage = $"Error: {ex.Message}";
+        }
+    }
+
+    [RelayCommand]
+    private void ApplyDivide()
+    {
+        if (!IsImageLoaded || ImageData == null) return;
+        
+        try
+        {
+            // Apply to current image (stack operation)
+            _imageService.LoadImage(ImageData, ImageWidth, ImageHeight);
+            var result = _imageService.DivideValue(DivideValue);
+            ApplyProcessedImage(result, $"Divide: {DivideValue:F2}");
+        }
+        catch (Exception ex)
+        {
+            StatusMessage = $"Error: {ex.Message}";
+        }
+    }
+
+    [RelayCommand]
+    private void ApplyBrightness()
+    {
+        if (!IsImageLoaded || ImageData == null) return;
+        
+        try
+        {
+            // Apply to current image (stack operation)
+            _imageService.LoadImage(ImageData, ImageWidth, ImageHeight);
+            var result = _imageService.ChangeBrightness(BrightnessLevel);
+            ApplyProcessedImage(result, $"Brightness: {BrightnessLevel}");
+        }
+        catch (Exception ex)
+        {
+            StatusMessage = $"Error: {ex.Message}";
+        }
+    }
+
+    [RelayCommand]
+    private void ApplyGrayscaleAverage()
+    {
+        if (!IsImageLoaded || ImageData == null) return;
+        
+        try
+        {
+            // Apply to current image (stack operation)
+            _imageService.LoadImage(ImageData, ImageWidth, ImageHeight);
+            var result = _imageService.ToGrayscaleAverage();
+            ApplyProcessedImage(result, "Grayscale (Average)");
+        }
+        catch (Exception ex)
+        {
+            StatusMessage = $"Error: {ex.Message}";
+        }
+    }
+
+    [RelayCommand]
+    private void ApplyGrayscaleLuminosity()
+    {
+        if (!IsImageLoaded || ImageData == null) return;
+        
+        try
+        {
+            // Apply to current image (stack operation)
+            _imageService.LoadImage(ImageData, ImageWidth, ImageHeight);
+            var result = _imageService.ToGrayscaleLuminosity();
+            ApplyProcessedImage(result, "Grayscale (Luminosity)");
+        }
+        catch (Exception ex)
+        {
+            StatusMessage = $"Error: {ex.Message}";
+        }
+    }
+
+    // ============================================
+    // IMAGE QUALITY ENHANCEMENT FILTERS
+    // ============================================
+
+    [RelayCommand]
+    private void ApplySmoothingFilter()
+    {
+        if (!IsImageLoaded || ImageData == null) return;
+        
+        try
+        {
+            // Apply to current image (stack operation)
+            _imageService.LoadImage(ImageData, ImageWidth, ImageHeight);
+            var result = _imageService.ApplySmoothingFilter(SmoothingKernelSize);
+            ApplyProcessedImage(result, $"Smoothing (kernel: {SmoothingKernelSize})");
+        }
+        catch (Exception ex)
+        {
+            StatusMessage = $"Error: {ex.Message}";
+        }
+    }
+
+    [RelayCommand]
+    private void ApplyMedianFilter()
+    {
+        if (!IsImageLoaded || ImageData == null) return;
+        
+        try
+        {
+            // Apply to current image (stack operation)
+            _imageService.LoadImage(ImageData, ImageWidth, ImageHeight);
+            var result = _imageService.ApplyMedianFilter(MedianKernelSize);
+            ApplyProcessedImage(result, $"Median (kernel: {MedianKernelSize})");
+        }
+        catch (Exception ex)
+        {
+            StatusMessage = $"Error: {ex.Message}";
+        }
+    }
+
+    [RelayCommand]
+    private void ApplySobelFilter()
+    {
+        if (!IsImageLoaded || ImageData == null) return;
+        
+        try
+        {
+            // Apply to current image (stack operation)
+            _imageService.LoadImage(ImageData, ImageWidth, ImageHeight);
+            var result = _imageService.ApplySobelFilter();
+            ApplyProcessedImage(result, "Sobel Edge Detection");
+        }
+        catch (Exception ex)
+        {
+            StatusMessage = $"Error: {ex.Message}";
+        }
+    }
+
+    [RelayCommand]
+    private void ApplySharpeningFilter()
+    {
+        if (!IsImageLoaded || ImageData == null) return;
+        
+        try
+        {
+            // Apply to current image (stack operation)
+            _imageService.LoadImage(ImageData, ImageWidth, ImageHeight);
+            var result = _imageService.ApplySharpeningFilter();
+            ApplyProcessedImage(result, "Sharpening");
+        }
+        catch (Exception ex)
+        {
+            StatusMessage = $"Error: {ex.Message}";
+        }
+    }
+
+    [RelayCommand]
+    private void ApplyGaussianBlur()
+    {
+        if (!IsImageLoaded || ImageData == null) return;
+        
+        try
+        {
+            // Apply to current image (stack operation)
+            _imageService.LoadImage(ImageData, ImageWidth, ImageHeight);
+            var result = _imageService.ApplyGaussianBlur(GaussianSigma);
+            ApplyProcessedImage(result, $"Gaussian Blur (sigma: {GaussianSigma:F2})");
+        }
+        catch (Exception ex)
+        {
+            StatusMessage = $"Error: {ex.Message}";
+        }
+    }
+
+    [RelayCommand]
+    private void ApplyCustomKernel()
+    {
+        if (!IsImageLoaded || ImageData == null) return;
+        
+        try
+        {
+            // Apply to current image (stack operation)
+            _imageService.LoadImage(ImageData, ImageWidth, ImageHeight);
+            var kernel = ParseCustomKernel(CustomKernelInput);
+            var result = _imageService.ApplyConvolution(kernel);
+            ApplyProcessedImage(result, $"Custom Kernel ({kernel.GetLength(0)}x{kernel.GetLength(1)})");
+        }
+        catch (Exception ex)
+        {
+            StatusMessage = $"Error: {ex.Message}";
+        }
+    }
+
+    [RelayCommand]
+    private void ResetToOriginal()
+    {
+        if (_originalImageData != null)
+        {
+            ImageData = (byte[])_originalImageData.Clone();
+            _imageService.LoadImage(ImageData, ImageWidth, ImageHeight);
+            StatusMessage = "Reset to original";
+            
+            // Clear history when resetting to original
+            _imageHistory.Clear();
+            CanUndo = false;
+            
+            // Reset all parameters to default
+            ResetAllFiltersAndTransformations();
+        }
+    }
+
+    [RelayCommand]
+    private void UndoLastFilter()
+    {
+        if (_imageHistory.Count > 0)
+        {
+            // Restore previous image from history
+            ImageData = _imageHistory.Pop();
+            _imageService.LoadImage(ImageData, ImageWidth, ImageHeight);
+            
+            CanUndo = _imageHistory.Count > 0;
+            StatusMessage = $"Undo applied. History: {_imageHistory.Count} steps";
+        }
+    }
+
+    /// <summary>
+    /// Resets all filter and transformation parameters to their default values.
+    /// </summary>
+    private void ResetAllFiltersAndTransformations()
+    {
+        // Point transformation parameters
+        AddValue = 0;
+        SubtractValue = 0;
+        MultiplyValue = 1.0;
+        DivideValue = 1.0;
+        BrightnessLevel = 0;
+        
+        // Filter parameters
+        SmoothingKernelSize = 3;
+        MedianKernelSize = 3;
+        GaussianSigma = 1.0;
+        CustomKernelInput = "0,-1,0\n-1,5,-1\n0,-1,0";
+        
+        // JPEG quality
+        JpegQuality = 100;
+    }
+
+    /// <summary>
+    /// Applies processed image data to the current view.
+    /// Saves current state to history for undo functionality.
+    /// </summary>
+    private void ApplyProcessedImage(byte[] processedData, string message)
+    {
+        // Save current image to history before applying new one
+        if (ImageData != null)
+        {
+            _imageHistory.Push((byte[])ImageData.Clone());
+            CanUndo = true;
+        }
+        
+        // Save current zoom and pan before updating
+        var currentZoom = _imageService.ZoomLevel;
+        var currentPanX = _imageService.PanX;
+        var currentPanY = _imageService.PanY;
+        
+        ImageData = processedData;
+        _imageService.UpdateImageData(processedData);
+        
+        // Restore zoom and pan after updating
+        _imageService.SetZoom(currentZoom);
+        _imageService.SetPan(currentPanX, currentPanY);
+        ZoomLevel = currentZoom;
+        
+        StatusMessage = message + $" (History: {_imageHistory.Count} steps)";
+    }
+
+    /// <summary>
+    /// Parses custom kernel input from text format.
+    /// Format: comma-separated values, rows separated by newlines.
+    /// Example: "0,-1,0\n-1,5,-1\n0,-1,0"
+    /// </summary>
+    private double[,] ParseCustomKernel(string input)
+    {
+        var lines = input.Split(new[] { '\n', '\r' }, StringSplitOptions.RemoveEmptyEntries);
+        if (lines.Length == 0)
+            throw new ArgumentException("Kernel input is empty");
+
+        var rows = lines.Length;
+        var cols = lines[0].Split(',').Length;
+
+        if (rows % 2 == 0 || cols % 2 == 0)
+            throw new ArgumentException("Kernel dimensions must be odd");
+
+        double[,] kernel = new double[rows, cols];
+
+        for (int i = 0; i < rows; i++)
+        {
+            var values = lines[i].Split(',');
+            if (values.Length != cols)
+                throw new ArgumentException("All rows must have the same number of columns");
+
+            for (int j = 0; j < cols; j++)
+            {
+                if (!double.TryParse(values[j].Trim(), out double value))
+                    throw new ArgumentException($"Invalid number format: {values[j]}");
+                kernel[i, j] = value;
+            }
+        }
+
+        return kernel;
+    }
 }
+

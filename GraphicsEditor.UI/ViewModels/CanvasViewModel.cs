@@ -465,6 +465,8 @@ public partial class CanvasViewModel : ViewModelBase
         if (_isDragging)
         {
             _isDragging = false;
+            // Update parameter fields after moving the shape
+            UpdateParametersFromSelectedShape();
             StatusMessage = "Shape moved";
         }
         else if (_drawingStartPoint.HasValue)
@@ -510,6 +512,35 @@ public partial class CanvasViewModel : ViewModelBase
     private bool TryParse(string value, out double result)
     {
         return double.TryParse(value, out result);
+    }
+
+    /// <summary>
+    /// Updates parameter text fields from the currently selected shape.
+    /// </summary>
+    public void UpdateParametersFromSelectedShape()
+    {
+        if (SelectedShape == null) return;
+
+        if (SelectedShape is Line line)
+        {
+            LineX1 = line.StartPoint.X.ToString("F1");
+            LineY1 = line.StartPoint.Y.ToString("F1");
+            LineX2 = line.EndPoint.X.ToString("F1");
+            LineY2 = line.EndPoint.Y.ToString("F1");
+        }
+        else if (SelectedShape is Core.Models.Rectangle rect)
+        {
+            RectX = rect.X.ToString("F1");
+            RectY = rect.Y.ToString("F1");
+            RectWidth = rect.Width.ToString("F1");
+            RectHeight = rect.Height.ToString("F1");
+        }
+        else if (SelectedShape is Circle circle)
+        {
+            CircleX = circle.Center.X.ToString("F1");
+            CircleY = circle.Center.Y.ToString("F1");
+            CircleRadius = circle.Radius.ToString("F1");
+        }
     }
 }
 

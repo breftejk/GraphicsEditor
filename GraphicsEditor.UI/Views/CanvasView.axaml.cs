@@ -40,6 +40,27 @@ public partial class CanvasView : UserControl
                 {
                     RenderShapes();
                 }
+                
+                // Sync selected shape when ViewModel's SelectedShape changes
+                if (e.PropertyName == nameof(ViewModel.SelectedShape))
+                {
+                    // Clear old selection
+                    if (_selectedShape != null)
+                    {
+                        _selectedShape.IsSelected = false;
+                    }
+                    
+                    // Update to new selection
+                    _selectedShape = ViewModel.SelectedShape;
+                    
+                    // Mark new selection
+                    if (_selectedShape != null)
+                    {
+                        _selectedShape.IsSelected = true;
+                    }
+                    
+                    RenderShapes();
+                }
             };
             _drawingCanvas = this.FindControl<Canvas>("DrawingCanvas");
             RenderShapes();
@@ -146,6 +167,8 @@ public partial class CanvasView : UserControl
         {
             _isResizing = false;
             _activeHandle = ResizeHandle.None;
+            // Update ViewModel parameters after resizing
+            ViewModel.UpdateParametersFromSelectedShape();
             return;
         }
 
@@ -153,6 +176,8 @@ public partial class CanvasView : UserControl
         if (_isDragging)
         {
             _isDragging = false;
+            // Update ViewModel parameters after dragging
+            ViewModel.UpdateParametersFromSelectedShape();
             return;
         }
         

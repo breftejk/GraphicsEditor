@@ -18,9 +18,13 @@ namespace GraphicsEditor.UI.ViewModels;
 public partial class CanvasViewModel : ViewModelBase
 {
     private readonly ShapeService _shapeService;
+    private readonly ShapeManipulationService _manipulationService;
 
     // Public accessor for the shape service
     public ShapeService ShapeService => _shapeService;
+    
+    // Public accessor for the manipulation service
+    public ShapeManipulationService ManipulationService => _manipulationService;
 
     [ObservableProperty]
     private ObservableCollection<IShape> _shapes;
@@ -89,6 +93,7 @@ public partial class CanvasViewModel : ViewModelBase
     public CanvasViewModel()
     {
         _shapeService = new ShapeService();
+        _manipulationService = new ShapeManipulationService();
         _shapes = _shapeService.Shapes;
         _selectedTool = DrawingTool.Select;
     }

@@ -6,6 +6,7 @@ using GraphicsEditor.UI.ViewModels;
 using GraphicsEditor.Core.Models;
 using GraphicsEditor.Core.Geometry;
 using System;
+using System.Linq;
 
 namespace GraphicsEditor.UI.Views;
 
@@ -79,7 +80,7 @@ public partial class CanvasView : UserControl
             // First check if we're clicking on a resize handle of selected shape
             if (_selectedShape != null)
             {
-                _activeHandle = GetHandleAtPoint(_selectedShape, _startPoint.X, _startPoint.Y);
+                _activeHandle = ViewModel.ManipulationService.GetHandleAtPoint(_selectedShape, _startPoint.X, _startPoint.Y, HandleSize);
                 if (_activeHandle != ResizeHandle.None)
                 {
                     _isResizing = true;
@@ -131,9 +132,12 @@ public partial class CanvasView : UserControl
         var currentPoint = e.GetPosition(_drawingCanvas);
 
         // Handle resizing
-        if (_isResizing && _selectedShape != null)
+        if (_isResizing && _selectedShape != null && ViewModel != null)
         {
-            ResizeShape(_selectedShape, _activeHandle, currentPoint.X - _lastDragPoint.X, currentPoint.Y - _lastDragPoint.Y);
+            var deltaX = currentPoint.X - _lastDragPoint.X;
+            var deltaY = currentPoint.Y - _lastDragPoint.Y;
+            var mousePos = new Point2D(currentPoint.X, currentPoint.Y);
+            ViewModel.ManipulationService.ResizeShape(_selectedShape, _activeHandle, deltaX, deltaY, mousePos);
             _lastDragPoint = currentPoint;
             RenderShapes();
             return;
@@ -331,224 +335,29 @@ public partial class CanvasView : UserControl
     
     private void DrawResizeHandles(IShape shape)
     {
-        if (_drawingCanvas == null) return;
+        if (_drawingCanvas == null || ViewModel == null) return;
         
-        var bounds = shape.GetBounds();
-        var handles = new[]
-        {
-            (bounds.X, bounds.Y), // Top-left
-            (bounds.X + bounds.Width, bounds.Y), // Top-right
-            (bounds.X, bounds.Y + bounds.Height), // Bottom-left
-            (bounds.X + bounds.Width, bounds.Y + bounds.Height), // Bottom-right
-        };
+        var handlePositions = ViewModel.ManipulationService.GetHandlePositions(shape);
         
-        foreach (var (x, y) in handles)
+        foreach (var (x, y, handleType) in handlePositions)
         {
+            // Corner handles are white with blue border, mid-point handles are light blue
+            var isCornerHandle = handleType == ResizeHandle.TopLeft || 
+                                handleType == ResizeHandle.TopRight || 
+                                handleType == ResizeHandle.BottomLeft || 
+                                handleType == ResizeHandle.BottomRight;
+            
             var handle = new Border
             {
                 Width = HandleSize,
                 Height = HandleSize,
-                Background = Brushes.White,
+                Background = isCornerHandle ? Brushes.White : Brushes.LightBlue,
                 BorderBrush = Brushes.Blue,
-                BorderThickness = new Avalonia.Thickness(2)
+                BorderThickness = new Avalonia.Thickness(isCornerHandle ? 2 : 1)
             };
             Canvas.SetLeft(handle, x - HandleSize / 2);
             Canvas.SetTop(handle, y - HandleSize / 2);
             _drawingCanvas.Children.Add(handle);
         }
-        
-        // Mid-point handles for rectangles and lines
-        if (shape is Core.Models.Rectangle || shape is Core.Models.Line)
-        {
-            var midHandles = new[]
-            {
-                (bounds.X + bounds.Width / 2, bounds.Y), // Top
-                (bounds.X + bounds.Width / 2, bounds.Y + bounds.Height), // Bottom
-                (bounds.X, bounds.Y + bounds.Height / 2), // Left
-                (bounds.X + bounds.Width, bounds.Y + bounds.Height / 2), // Right
-            };
-            
-            foreach (var (x, y) in midHandles)
-            {
-                var handle = new Border
-                {
-                    Width = HandleSize,
-                    Height = HandleSize,
-                    Background = Brushes.LightBlue,
-                    BorderBrush = Brushes.Blue,
-                    BorderThickness = new Avalonia.Thickness(1)
-                };
-                Canvas.SetLeft(handle, x - HandleSize / 2);
-                Canvas.SetTop(handle, y - HandleSize / 2);
-                _drawingCanvas.Children.Add(handle);
-            }
-        }
     }
-    
-    private ResizeHandle GetHandleAtPoint(IShape shape, double x, double y)
-    {
-        var bounds = shape.GetBounds();
-        double tolerance = HandleSize / 2 + 2;
-        
-        // Check corner handles first
-        if (Math.Abs(x - bounds.X) < tolerance && Math.Abs(y - bounds.Y) < tolerance)
-            return ResizeHandle.TopLeft;
-        if (Math.Abs(x - (bounds.X + bounds.Width)) < tolerance && Math.Abs(y - bounds.Y) < tolerance)
-            return ResizeHandle.TopRight;
-        if (Math.Abs(x - bounds.X) < tolerance && Math.Abs(y - (bounds.Y + bounds.Height)) < tolerance)
-            return ResizeHandle.BottomLeft;
-        if (Math.Abs(x - (bounds.X + bounds.Width)) < tolerance && Math.Abs(y - (bounds.Y + bounds.Height)) < tolerance)
-            return ResizeHandle.BottomRight;
-        
-        // Check mid-point handles for rectangles and lines
-        if (shape is Core.Models.Rectangle || shape is Core.Models.Line)
-        {
-            if (Math.Abs(x - (bounds.X + bounds.Width / 2)) < tolerance && Math.Abs(y - bounds.Y) < tolerance)
-                return ResizeHandle.Top;
-            if (Math.Abs(x - (bounds.X + bounds.Width / 2)) < tolerance && Math.Abs(y - (bounds.Y + bounds.Height)) < tolerance)
-                return ResizeHandle.Bottom;
-            if (Math.Abs(x - bounds.X) < tolerance && Math.Abs(y - (bounds.Y + bounds.Height / 2)) < tolerance)
-                return ResizeHandle.Left;
-            if (Math.Abs(x - (bounds.X + bounds.Width)) < tolerance && Math.Abs(y - (bounds.Y + bounds.Height / 2)) < tolerance)
-                return ResizeHandle.Right;
-        }
-        
-        return ResizeHandle.None;
-    }
-    
-    private void ResizeShape(IShape shape, ResizeHandle handle, double deltaX, double deltaY)
-    {
-        if (shape is Core.Models.Rectangle rect)
-        {
-            switch (handle)
-            {
-                case ResizeHandle.TopLeft:
-                    rect.X += deltaX;
-                    rect.Y += deltaY;
-                    rect.Width -= deltaX;
-                    rect.Height -= deltaY;
-                    break;
-                case ResizeHandle.TopRight:
-                    rect.Y += deltaY;
-                    rect.Width += deltaX;
-                    rect.Height -= deltaY;
-                    break;
-                case ResizeHandle.BottomLeft:
-                    rect.X += deltaX;
-                    rect.Width -= deltaX;
-                    rect.Height += deltaY;
-                    break;
-                case ResizeHandle.BottomRight:
-                    rect.Width += deltaX;
-                    rect.Height += deltaY;
-                    break;
-                case ResizeHandle.Top:
-                    rect.Y += deltaY;
-                    rect.Height -= deltaY;
-                    break;
-                case ResizeHandle.Bottom:
-                    rect.Height += deltaY;
-                    break;
-                case ResizeHandle.Left:
-                    rect.X += deltaX;
-                    rect.Width -= deltaX;
-                    break;
-                case ResizeHandle.Right:
-                    rect.Width += deltaX;
-                    break;
-            }
-            
-            // Ensure minimum size
-            if (rect.Width < 10) rect.Width = 10;
-            if (rect.Height < 10) rect.Height = 10;
-        }
-        else if (shape is Core.Models.Circle circle)
-        {
-            // For circles, only corner handles work - they change the radius
-            var centerX = circle.Center.X;
-            var centerY = circle.Center.Y;
-            
-            switch (handle)
-            {
-                case ResizeHandle.TopLeft:
-                case ResizeHandle.TopRight:
-                case ResizeHandle.BottomLeft:
-                case ResizeHandle.BottomRight:
-                    // Calculate new radius based on distance from center to mouse position
-                    var newRadius = Math.Sqrt(
-                        Math.Pow(_lastDragPoint.X - centerX, 2) + 
-                        Math.Pow(_lastDragPoint.Y - centerY, 2)
-                    );
-                    circle.Radius = Math.Max(5, newRadius); // Minimum radius of 5
-                    break;
-            }
-        }
-        else if (shape is Core.Models.Line line)
-        {
-            switch (handle)
-            {
-                case ResizeHandle.TopLeft:
-                    line.StartPoint = new Point2D(line.StartPoint.X + deltaX, line.StartPoint.Y + deltaY);
-                    break;
-                case ResizeHandle.BottomRight:
-                    line.EndPoint = new Point2D(line.EndPoint.X + deltaX, line.EndPoint.Y + deltaY);
-                    break;
-                case ResizeHandle.TopRight:
-                case ResizeHandle.BottomLeft:
-                    // For lines, top-right and bottom-left also move endpoints
-                    var bounds = line.GetBounds();
-                    if (line.StartPoint.Y < line.EndPoint.Y)
-                    {
-                        if (handle == ResizeHandle.TopRight)
-                            line.StartPoint = new Point2D(line.StartPoint.X + deltaX, line.StartPoint.Y + deltaY);
-                        else
-                            line.EndPoint = new Point2D(line.EndPoint.X + deltaX, line.EndPoint.Y + deltaY);
-                    }
-                    else
-                    {
-                        if (handle == ResizeHandle.TopRight)
-                            line.EndPoint = new Point2D(line.EndPoint.X + deltaX, line.EndPoint.Y + deltaY);
-                        else
-                            line.StartPoint = new Point2D(line.StartPoint.X + deltaX, line.StartPoint.Y + deltaY);
-                    }
-                    break;
-                case ResizeHandle.Top:
-                case ResizeHandle.Bottom:
-                case ResizeHandle.Left:
-                case ResizeHandle.Right:
-                    // Mid-point handles move the closer endpoint
-                    var midX = (line.StartPoint.X + line.EndPoint.X) / 2;
-                    var midY = (line.StartPoint.Y + line.EndPoint.Y) / 2;
-                    
-                    if (handle == ResizeHandle.Top || handle == ResizeHandle.Bottom)
-                    {
-                        if (Math.Abs(line.StartPoint.Y - midY) < Math.Abs(line.EndPoint.Y - midY))
-                            line.StartPoint = new Point2D(line.StartPoint.X, line.StartPoint.Y + deltaY);
-                        else
-                            line.EndPoint = new Point2D(line.EndPoint.X, line.EndPoint.Y + deltaY);
-                    }
-                    else // Left or Right
-                    {
-                        if (Math.Abs(line.StartPoint.X - midX) < Math.Abs(line.EndPoint.X - midX))
-                            line.StartPoint = new Point2D(line.StartPoint.X + deltaX, line.StartPoint.Y);
-                        else
-                            line.EndPoint = new Point2D(line.EndPoint.X + deltaX, line.EndPoint.Y);
-                    }
-                    break;
-            }
-        }
-    }
-}
-
-enum ResizeHandle
-{
-    None,
-    TopLeft,
-    TopRight,
-    BottomLeft,
-    BottomRight,
-    Top,
-    Bottom,
-    Left,
-    Right
 }

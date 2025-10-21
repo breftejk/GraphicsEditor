@@ -7,15 +7,15 @@ using GraphicsEditor.Logic;
 namespace GraphicsEditor.UI.ViewModels;
 
 /// <summary>
-/// View model for 3D visualization (RGB Cube).
+/// View model for HSV Cone visualization.
 /// </summary>
-public partial class ThreeDViewModel : ViewModelBase
+public partial class HsvConeViewModel : ViewModelBase
 {
     private readonly ThreeDRenderingService _renderingService;
 
     public ThreeDRenderingService ThreeDService => _renderingService;
 
-    public IEnumerable<CrossSectionAxis> AvailableAxes { get; } = Enum.GetValues<CrossSectionAxis>();
+    public IEnumerable<HsvCrossSectionType> AvailableCrossSectionTypes { get; } = Enum.GetValues<HsvCrossSectionType>();
 
     [ObservableProperty]
     private double _rotationX;
@@ -27,7 +27,7 @@ public partial class ThreeDViewModel : ViewModelBase
     private double _rotationZ;
 
     [ObservableProperty]
-    private CrossSectionAxis _selectedAxis = CrossSectionAxis.X;
+    private HsvCrossSectionType _selectedCrossSectionType = HsvCrossSectionType.Horizontal;
 
     [ObservableProperty]
     private double _crossSectionPosition = 0.5;
@@ -36,28 +36,28 @@ public partial class ThreeDViewModel : ViewModelBase
     private bool _showCrossSection;
 
     [ObservableProperty]
-    private List<RgbCubeVertex> _cubeVertices;
+    private List<HsvConeVertex> _coneVertices;
 
     [ObservableProperty]
-    private List<RgbCubeVertex> _crossSectionVertices;
+    private List<HsvConeVertex> _crossSectionVertices;
 
     [ObservableProperty]
-    private string _statusMessage = "RGB Cube Visualization";
+    private string _statusMessage = "HSV Cone Visualization";
 
-    public ThreeDViewModel()
+    public HsvConeViewModel()
     {
         _renderingService = new ThreeDRenderingService();
-        _cubeVertices = new List<RgbCubeVertex>();
-        _crossSectionVertices = new List<RgbCubeVertex>();
-        GenerateCube();
+        _coneVertices = new List<HsvConeVertex>();
+        _crossSectionVertices = new List<HsvConeVertex>();
+        GenerateCone();
     }
 
     [RelayCommand]
-    private void GenerateCube()
+    private void GenerateCone()
     {
-        CubeVertices = _renderingService.GenerateRgbCubeVertices(10);
+        ConeVertices = _renderingService.GenerateHsvConeVertices(36, 10);
         UpdateCrossSection();
-        StatusMessage = $"Generated RGB Cube with {CubeVertices.Count} vertices";
+        StatusMessage = $"Generated HSV Cone with {ConeVertices.Count} vertices";
     }
 
     [RelayCommand]
@@ -102,36 +102,33 @@ public partial class ThreeDViewModel : ViewModelBase
     {
         if (!ShowCrossSection)
         {
-            CrossSectionVertices = new List<RgbCubeVertex>();
+            CrossSectionVertices = new List<HsvConeVertex>();
             return;
         }
 
-        CrossSectionVertices = _renderingService.GenerateRgbCubeCrossSection(
-            SelectedAxis, 
-            CrossSectionPosition, 
-            4);
+        CrossSectionVertices = _renderingService.GenerateHsvConeCrossSection(
+            SelectedCrossSectionType,
+            CrossSectionPosition,
+            3);
 
-        string axisName = SelectedAxis switch
+        string typeName = SelectedCrossSectionType switch
         {
-            CrossSectionAxis.X => "Red",
-            CrossSectionAxis.Y => "Green",
-            CrossSectionAxis.Z => "Blue",
+            HsvCrossSectionType.Horizontal => "Horizontal (Value)",
+            HsvCrossSectionType.Vertical => "Vertical (Hue)",
             _ => "Unknown"
         };
 
-        StatusMessage = $"Cross-section: {axisName} axis at {CrossSectionPosition:F2} ({CrossSectionVertices.Count} points)";
+        StatusMessage = $"Cross-section: {typeName} at {CrossSectionPosition:F2} ({CrossSectionVertices.Count} points)";
     }
 
-    partial void OnSelectedAxisChanged(CrossSectionAxis value) => UpdateCrossSection();
-    
+    partial void OnSelectedCrossSectionTypeChanged(HsvCrossSectionType value) => UpdateCrossSection();
     partial void OnCrossSectionPositionChanged(double value) => UpdateCrossSection();
-    
     partial void OnShowCrossSectionChanged(bool value)
     {
         if (value)
             UpdateCrossSection();
         else
-            CrossSectionVertices = new List<RgbCubeVertex>();
+            CrossSectionVertices = new List<HsvConeVertex>();
     }
 
     public void OnMouseDrag(double deltaX, double deltaY)

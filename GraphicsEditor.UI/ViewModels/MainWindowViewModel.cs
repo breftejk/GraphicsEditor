@@ -20,6 +20,9 @@ public partial class MainWindowViewModel : ViewModelBase
     private ThreeDViewModel _threeDViewModel;
 
     [ObservableProperty]
+    private HsvConeViewModel _hsvConeViewModel;
+
+    [ObservableProperty]
     private int _selectedTabIndex;
 
     public MainWindowViewModel()
@@ -28,6 +31,7 @@ public partial class MainWindowViewModel : ViewModelBase
         _imageViewerViewModel = new ImageViewerViewModel();
         _colorConverterViewModel = new ColorConverterViewModel();
         _threeDViewModel = new ThreeDViewModel();
+        _hsvConeViewModel = new HsvConeViewModel();
         _selectedTabIndex = 0;
     }
 }

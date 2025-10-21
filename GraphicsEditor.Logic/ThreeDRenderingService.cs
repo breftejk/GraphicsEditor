@@ -65,30 +65,36 @@ public class ThreeDRenderingService
                 double v = j / (double)resolution;
 
                 RgbColor color;
-                Point2D point;
+                double x, y, z;
 
                 switch (axis)
                 {
-                    case CrossSectionAxis.X: // Slice perpendicular to R axis
+                    case CrossSectionAxis.X: // Slice perpendicular to X axis (constant R)
+                        x = position;  // Fixed position on X axis
+                        y = u;         // Green varies
+                        z = v;         // Blue varies
                         color = new RgbColor((byte)(position * 255), (byte)(u * 255), (byte)(v * 255));
-                        point = new Point2D(u, v);
                         break;
 
-                    case CrossSectionAxis.Y: // Slice perpendicular to G axis
+                    case CrossSectionAxis.Y: // Slice perpendicular to Y axis (constant G)
+                        x = u;         // Red varies
+                        y = position;  // Fixed position on Y axis
+                        z = v;         // Blue varies
                         color = new RgbColor((byte)(u * 255), (byte)(position * 255), (byte)(v * 255));
-                        point = new Point2D(u, v);
                         break;
 
-                    case CrossSectionAxis.Z: // Slice perpendicular to B axis
+                    case CrossSectionAxis.Z: // Slice perpendicular to Z axis (constant B)
+                        x = u;         // Red varies
+                        y = v;         // Green varies
+                        z = position;  // Fixed position on Z axis
                         color = new RgbColor((byte)(u * 255), (byte)(v * 255), (byte)(position * 255));
-                        point = new Point2D(u, v);
                         break;
 
                     default:
                         throw new ArgumentException("Invalid axis");
                 }
 
-                vertices.Add(new RgbCubeVertex(point.X, point.Y, position, color));
+                vertices.Add(new RgbCubeVertex(x, y, z, color));
             }
         }
 
@@ -102,6 +108,7 @@ public class ThreeDRenderingService
     {
         var vertices = new List<HsvConeVertex>();
 
+        // Generate cone surface
         for (int h = 0; h <= heightSegments; h++)
         {
             double value = h / (double)heightSegments; // 0 at tip, 1 at base
@@ -124,6 +131,89 @@ public class ThreeDRenderingService
 
                 vertices.Add(new HsvConeVertex(x, y, z, hsvColor, rgbColor));
             }
+        }
+
+        // Add base (bottom circle) - fill it with points at different saturations
+        int baseSaturationLevels = 5;
+        for (int s = 0; s <= baseSaturationLevels; s++)
+        {
+            double saturation = (s / (double)baseSaturationLevels) * 100;
+            double radiusFraction = saturation / 100.0;
+
+            for (int r = 0; r <= radialSegments; r++)
+            {
+                double hue = (r / (double)radialSegments) * 360;
+                double value = 100; // Maximum value at base
+
+                var hsvColor = new HsvColor(hue, saturation, value);
+                var rgbColor = HsvConverter.HsvToRgb(hsvColor);
+
+                double angle = hue * Math.PI / 180.0;
+                double x = radiusFraction * Math.Cos(angle);
+                double y = 1.0; // Base at y=1
+                double z = radiusFraction * Math.Sin(angle);
+
+                vertices.Add(new HsvConeVertex(x, y, z, hsvColor, rgbColor));
+            }
+        }
+
+        return vertices;
+    }
+
+    /// <summary>
+    /// Generates a cross-section of the HSV cone.
+    /// </summary>
+    public List<HsvConeVertex> GenerateHsvConeCrossSection(HsvCrossSectionType type, double position, int resolution = 20)
+    {
+        var vertices = new List<HsvConeVertex>();
+        position = Math.Clamp(position, 0, 1);
+
+        if (type == HsvCrossSectionType.Horizontal)
+        {
+            // Horizontal slice - just store radius and height
+            double value = position * 100;
+            double radius = position;
+            double y = position;
+
+            // Generate ellipse as polygon points for proper 3D rotation
+            int numPoints = 36;
+            for (int i = 0; i <= numPoints; i++)
+            {
+                double angle = (i / (double)numPoints) * 2 * Math.PI;
+                double x = radius * Math.Cos(angle);
+                double z = radius * Math.Sin(angle);
+
+                var hsvColor = new HsvColor(0, 100, value);
+                var rgbColor = HsvConverter.HsvToRgb(hsvColor);
+
+                vertices.Add(new HsvConeVertex(x, y, z, hsvColor, rgbColor));
+            }
+        }
+        else // Vertical
+        {
+            // Vertical slice - just 3 points for a triangle
+            double hue = position * 360;
+            double angle = hue * Math.PI / 180.0;
+            double oppositeAngle = (hue + 180) * Math.PI / 180.0;
+
+            // Point 1: Apex (top, center)
+            var apex = new HsvColor(hue, 0, 0);
+            var apexRgb = HsvConverter.HsvToRgb(apex);
+            vertices.Add(new HsvConeVertex(0, 0, 0, apex, apexRgb));
+
+            // Point 2: Base edge at hue angle
+            var edge1 = new HsvColor(hue, 100, 100);
+            var edge1Rgb = HsvConverter.HsvToRgb(edge1);
+            double x1 = Math.Cos(angle);
+            double z1 = Math.Sin(angle);
+            vertices.Add(new HsvConeVertex(x1, 1, z1, edge1, edge1Rgb));
+
+            // Point 3: Base edge at opposite angle
+            var edge2 = new HsvColor((hue + 180) % 360, 100, 100);
+            var edge2Rgb = HsvConverter.HsvToRgb(edge2);
+            double x2 = Math.Cos(oppositeAngle);
+            double z2 = Math.Sin(oppositeAngle);
+            vertices.Add(new HsvConeVertex(x2, 1, z2, edge2, edge2Rgb));
         }
 
         return vertices;
@@ -210,4 +300,10 @@ public enum CrossSectionAxis
     X, // Red axis
     Y, // Green axis
     Z  // Blue axis
+}
+
+public enum HsvCrossSectionType
+{
+    Horizontal, // Slice parallel to base (constant Value/Height)
+    Vertical    // Slice through apex (constant Hue/Angle)
 }

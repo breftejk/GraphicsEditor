@@ -39,3 +39,9 @@ desktop.ini
 
 # Shapes generated during design time
 shapes.json
+
+# Ouput image
+output.jpg
+
+# Test ppm file
+test.ppm

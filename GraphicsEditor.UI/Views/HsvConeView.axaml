@@ -4,8 +4,8 @@
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:vm="using:GraphicsEditor.UI.ViewModels"
              mc:Ignorable="d" d:DesignWidth="1200" d:DesignHeight="800"
-             x:Class="GraphicsEditor.UI.Views.ThreeDView"
-             x:DataType="vm:ThreeDViewModel">
+             x:Class="GraphicsEditor.UI.Views.HsvConeView"
+             x:DataType="vm:HsvConeViewModel">
 
     <Grid>
         <Grid.RowDefinitions>
@@ -38,14 +38,13 @@
 
             <!-- 3D Rendering Canvas -->
             <Border Grid.Column="0" Background="Black" Margin="5">
-                <Canvas Name="RgbCubeCanvas" 
+                <Canvas Name="HsvConeCanvas" 
                         Background="#222222"
-                        PointerPressed="Display3DCanvas_OnPointerPressed"
-                        PointerMoved="Display3DCanvas_OnPointerMoved"
-                        PointerReleased="Display3DCanvas_OnPointerReleased"
+                        PointerPressed="DisplayConeCanvas_OnPointerPressed"
+                        PointerMoved="DisplayConeCanvas_OnPointerMoved"
+                        PointerReleased="DisplayConeCanvas_OnPointerReleased"
                         Cursor="Hand">
-                    <!-- RGB Cube will be rendered here -->
-                    <TextBlock Text="RGB Cube Visualization" 
+                    <TextBlock Text="HSV Cone Visualization" 
                                Canvas.Left="20" 
                                Canvas.Top="20"
                                Foreground="White"
@@ -60,7 +59,7 @@
 
             <!-- Control Panel -->
             <StackPanel Grid.Column="1" Margin="10" Spacing="15">
-                <TextBlock Text="RGB Cube Controls" FontSize="18" FontWeight="Bold"/>
+                <TextBlock Text="HSV Cone Controls" FontSize="18" FontWeight="Bold"/>
 
                 <!-- Rotation Display -->
                 <Border BorderBrush="Gray" BorderThickness="1" CornerRadius="4">
@@ -91,9 +90,9 @@
                     <DockPanel>
                         <TextBlock DockPanel.Dock="Top" Text="Cross-Section Settings" FontWeight="Bold" Margin="8,4" Background="#F0F0F0"/>
                         <StackPanel Spacing="10" Margin="8">
-                            <TextBlock Text="Slice Axis:" FontWeight="SemiBold"/>
-                            <ComboBox ItemsSource="{Binding AvailableAxes}" 
-                                      SelectedItem="{Binding SelectedAxis}"/>
+                            <TextBlock Text="Cross-Section Type:" FontWeight="SemiBold"/>
+                            <ComboBox ItemsSource="{Binding AvailableCrossSectionTypes}" 
+                                      SelectedItem="{Binding SelectedCrossSectionType}"/>
 
                             <TextBlock Text="Position:" FontWeight="SemiBold" Margin="0,10,0,0"/>
                             <Slider Minimum="0" Maximum="1" Value="{Binding CrossSectionPosition}" 
@@ -104,43 +103,16 @@
                     </DockPanel>
                 </Border>
 
-                <!-- Legend -->
+                <!-- Information -->
                 <Border BorderBrush="Gray" BorderThickness="1" CornerRadius="4">
                     <DockPanel>
-                        <TextBlock DockPanel.Dock="Top" Text="RGB Cube Vertices" FontWeight="Bold" Margin="8,4" Background="#F0F0F0"/>
+                        <TextBlock DockPanel.Dock="Top" Text="HSV Cone Structure" FontWeight="Bold" Margin="8,4" Background="#F0F0F0"/>
                         <StackPanel Spacing="3" Margin="8">
-                            <Grid ColumnDefinitions="20,*">
-                                <Border Grid.Column="0" Width="16" Height="16" Background="Black" BorderBrush="White" BorderThickness="1"/>
-                                <TextBlock Grid.Column="1" Text="(0,0,0) - Black" Margin="5,0"/>
-                            </Grid>
-                            <Grid ColumnDefinitions="20,*">
-                                <Border Grid.Column="0" Width="16" Height="16" Background="Red"/>
-                                <TextBlock Grid.Column="1" Text="(1,0,0) - Red" Margin="5,0"/>
-                            </Grid>
-                            <Grid ColumnDefinitions="20,*">
-                                <Border Grid.Column="0" Width="16" Height="16" Background="Green"/>
-                                <TextBlock Grid.Column="1" Text="(0,1,0) - Green" Margin="5,0"/>
-                            </Grid>
-                            <Grid ColumnDefinitions="20,*">
-                                <Border Grid.Column="0" Width="16" Height="16" Background="Blue"/>
-                                <TextBlock Grid.Column="1" Text="(0,0,1) - Blue" Margin="5,0"/>
-                            </Grid>
-                            <Grid ColumnDefinitions="20,*">
-                                <Border Grid.Column="0" Width="16" Height="16" Background="Cyan"/>
-                                <TextBlock Grid.Column="1" Text="(0,1,1) - Cyan" Margin="5,0"/>
-                            </Grid>
-                            <Grid ColumnDefinitions="20,*">
-                                <Border Grid.Column="0" Width="16" Height="16" Background="Magenta"/>
-                                <TextBlock Grid.Column="1" Text="(1,0,1) - Magenta" Margin="5,0"/>
-                            </Grid>
-                            <Grid ColumnDefinitions="20,*">
-                                <Border Grid.Column="0" Width="16" Height="16" Background="Yellow"/>
-                                <TextBlock Grid.Column="1" Text="(1,1,0) - Yellow" Margin="5,0"/>
-                            </Grid>
-                            <Grid ColumnDefinitions="20,*">
-                                <Border Grid.Column="0" Width="16" Height="16" Background="White" BorderBrush="Black" BorderThickness="1"/>
-                                <TextBlock Grid.Column="1" Text="(1,1,1) - White" Margin="5,0"/>
-                            </Grid>
+                            <TextBlock Text="• Apex (top): Black (V=0)" TextWrapping="Wrap"/>
+                            <TextBlock Text="• Base (bottom): Saturated colors (V=100)" TextWrapping="Wrap"/>
+                            <TextBlock Text="• Angle around: Hue (0°-360°)" TextWrapping="Wrap"/>
+                            <TextBlock Text="• Distance from center: Saturation" TextWrapping="Wrap"/>
+                            <TextBlock Text="• Height: Value/Brightness" TextWrapping="Wrap"/>
                         </StackPanel>
                     </DockPanel>
                 </Border>
@@ -150,10 +122,11 @@
                     <DockPanel>
                         <TextBlock DockPanel.Dock="Top" Text="Instructions" FontWeight="Bold" Margin="8,4" Background="#F0F0F0"/>
                         <StackPanel Spacing="3" Margin="8">
-                            <TextBlock Text="• Use rotation buttons to rotate cube" TextWrapping="Wrap"/>
+                            <TextBlock Text="• Use rotation buttons to rotate cone" TextWrapping="Wrap"/>
                             <TextBlock Text="• Drag on canvas to rotate interactively" TextWrapping="Wrap"/>
                             <TextBlock Text="• Enable cross-section to view a slice" TextWrapping="Wrap"/>
-                            <TextBlock Text="• Select axis and adjust position" TextWrapping="Wrap"/>
+                            <TextBlock Text="• Horizontal: constant Value" TextWrapping="Wrap"/>
+                            <TextBlock Text="• Vertical: constant Hue angle" TextWrapping="Wrap"/>
                         </StackPanel>
                     </DockPanel>
                 </Border>

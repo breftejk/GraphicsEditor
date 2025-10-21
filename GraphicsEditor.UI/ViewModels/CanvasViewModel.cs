@@ -124,6 +124,12 @@ public partial class CanvasViewModel : ViewModelBase
             LineY1 = line.StartPoint.Y.ToString("F1");
             LineX2 = line.EndPoint.X.ToString("F1");
             LineY2 = line.EndPoint.Y.ToString("F1");
+            
+            // Update color and style controls to match selected shape
+            CurrentStrokeColor = line.StrokeColor;
+            CurrentStrokeThickness = line.StrokeThickness;
+            CurrentFillColor = null;
+            HasFill = false;
         }
         else if (value is Core.Models.Rectangle rect)
         {
@@ -131,12 +137,24 @@ public partial class CanvasViewModel : ViewModelBase
             RectY = rect.Y.ToString("F1");
             RectWidth = rect.Width.ToString("F1");
             RectHeight = rect.Height.ToString("F1");
+            
+            // Update color and style controls to match selected shape
+            CurrentStrokeColor = rect.StrokeColor;
+            CurrentStrokeThickness = rect.StrokeThickness;
+            CurrentFillColor = rect.FillColor;
+            HasFill = rect.FillColor.HasValue;
         }
         else if (value is Circle circle)
         {
             CircleX = circle.Center.X.ToString("F1");
             CircleY = circle.Center.Y.ToString("F1");
             CircleRadius = circle.Radius.ToString("F1");
+            
+            // Update color and style controls to match selected shape
+            CurrentStrokeColor = circle.StrokeColor;
+            CurrentStrokeThickness = circle.StrokeThickness;
+            CurrentFillColor = circle.FillColor;
+            HasFill = circle.FillColor.HasValue;
         }
         
         // Notify properties for visibility
@@ -215,10 +233,15 @@ public partial class CanvasViewModel : ViewModelBase
     [RelayCommand]
     private void DeleteSelected()
     {
-        if (_shapeService.RemoveSelectedShape())
+        if (SelectedShape != null && _shapeService.RemoveSelectedShape())
         {
             SelectedShape = null;
             StatusMessage = "Shape deleted";
+            OnPropertyChanged(nameof(Shapes)); // Trigger UI update
+        }
+        else
+        {
+            StatusMessage = "No shape selected to delete";
         }
     }
 
@@ -226,6 +249,7 @@ public partial class CanvasViewModel : ViewModelBase
     private void ClearAll()
     {
         _shapeService.ClearShapes();
+        SelectedShape = null;
         StatusMessage = "Canvas cleared";
     }
 
@@ -331,6 +355,7 @@ public partial class CanvasViewModel : ViewModelBase
                 {
                     line.StartPoint = new Point2D(x1, y1);
                     line.EndPoint = new Point2D(x2, y2);
+                    OnPropertyChanged(nameof(Shapes)); // Trigger re-render
                     StatusMessage = "Line updated";
                 }
                 else
@@ -348,6 +373,7 @@ public partial class CanvasViewModel : ViewModelBase
                     rect.Y = y;
                     rect.Width = width;
                     rect.Height = height;
+                    OnPropertyChanged(nameof(Shapes)); // Trigger re-render
                     StatusMessage = "Rectangle updated";
                 }
                 else
@@ -363,6 +389,7 @@ public partial class CanvasViewModel : ViewModelBase
                 {
                     circle.Center = new Point2D(x, y);
                     circle.Radius = radius;
+                    OnPropertyChanged(nameof(Shapes)); // Trigger re-render
                     StatusMessage = "Circle updated";
                 }
                 else
@@ -398,6 +425,7 @@ public partial class CanvasViewModel : ViewModelBase
             {
                 _shapeService.DeselectShape();
                 SelectedShape = null;
+                StatusMessage = "Selection cleared";
             }
         }
         else

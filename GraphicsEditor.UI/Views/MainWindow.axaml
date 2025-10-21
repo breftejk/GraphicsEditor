@@ -32,8 +32,13 @@
         </TabItem>
 
         <!-- 3D Visualization Tab -->
-        <TabItem Header="3D Visualization">
+        <TabItem Header="3D - RGB Cube">
             <views:ThreeDView DataContext="{Binding ThreeDViewModel}" />
+        </TabItem>
+
+        <!-- HSV Cone Tab -->
+        <TabItem Header="3D - HSV Cone">
+            <views:HsvConeView DataContext="{Binding HsvConeViewModel}" />
         </TabItem>
     </TabControl>
 

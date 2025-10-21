@@ -30,7 +30,9 @@ public partial class ThreeDView : UserControl
             {
                 if (e.PropertyName == nameof(ViewModel.RotationX) ||
                     e.PropertyName == nameof(ViewModel.RotationY) ||
-                    e.PropertyName == nameof(ViewModel.RotationZ))
+                    e.PropertyName == nameof(ViewModel.RotationZ) ||
+                    e.PropertyName == nameof(ViewModel.ShowCrossSection) ||
+                    e.PropertyName == nameof(ViewModel.CrossSectionVertices))
                 {
                     RenderCube();
                 }
@@ -125,6 +127,68 @@ public partial class ThreeDView : UserControl
 
         // Draw cube edges (8 vertices, 12 edges)
         DrawCubeEdges(centerX, centerY, scale);
+        
+        // Draw cross-section if enabled
+        if (ViewModel.ShowCrossSection && ViewModel.CrossSectionVertices.Count > 0)
+        {
+            DrawCrossSection(centerX, centerY, scale);
+        }
+    }
+
+    private void DrawCrossSection(double centerX, double centerY, double scale)
+    {
+        if (_rgbCubeCanvas == null || ViewModel == null) return;
+
+        var crossSectionVertices = ViewModel.CrossSectionVertices;
+        if (crossSectionVertices == null || crossSectionVertices.Count == 0) return;
+
+        // Rotate all vertices
+        var rotatedVertices = new List<(double X, double Y, double Z, byte R, byte G, byte B)>(crossSectionVertices.Count);
+        foreach (var vertex in crossSectionVertices)
+        {
+            var rotated = RotateVertex(vertex.X, vertex.Y, vertex.Z,
+                ViewModel.RotationX, ViewModel.RotationY, ViewModel.RotationZ);
+            rotatedVertices.Add((rotated.X, rotated.Y, rotated.Z, vertex.Color.R, vertex.Color.G, vertex.Color.B));
+        }
+
+        // Calculate grid size
+        int gridSize = (int)Math.Sqrt(crossSectionVertices.Count);
+        
+        // Draw each grid cell as a filled rectangle
+        for (int i = 0; i < gridSize - 1; i++)
+        {
+            for (int j = 0; j < gridSize - 1; j++)
+            {
+                int idx0 = i * gridSize + j;
+                int idx1 = i * gridSize + (j + 1);
+                int idx2 = (i + 1) * gridSize + (j + 1);
+                int idx3 = (i + 1) * gridSize + j;
+
+                if (idx0 >= rotatedVertices.Count || idx1 >= rotatedVertices.Count ||
+                    idx2 >= rotatedVertices.Count || idx3 >= rotatedVertices.Count)
+                    continue;
+
+                var v0 = rotatedVertices[idx0];
+                var v1 = rotatedVertices[idx1];
+                var v2 = rotatedVertices[idx2];
+                var v3 = rotatedVertices[idx3];
+
+                var polygon = new Polygon
+                {
+                    Fill = new SolidColorBrush(Color.FromRgb(255, 165, 0)),
+                    Stroke = null,
+                    Points = new List<Avalonia.Point>
+                    {
+                        new Avalonia.Point(centerX + v0.X * scale, centerY - v0.Y * scale),
+                        new Avalonia.Point(centerX + v1.X * scale, centerY - v1.Y * scale),
+                        new Avalonia.Point(centerX + v2.X * scale, centerY - v2.Y * scale),
+                        new Avalonia.Point(centerX + v3.X * scale, centerY - v3.Y * scale)
+                    }
+                };
+
+                _rgbCubeCanvas.Children.Add(polygon);
+            }
+        }
     }
 
     private void DrawCubeEdges(double centerX, double centerY, double scale)

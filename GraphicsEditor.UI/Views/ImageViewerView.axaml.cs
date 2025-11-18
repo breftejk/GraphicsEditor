@@ -36,6 +36,13 @@ public partial class ImageViewerView : UserControl
         // Subscribe to DataContext changes to wire up PropertyChanged
         this.DataContextChanged += OnDataContextChanged;
         
+        // Ensure the ImageCanvas has a ScaleTransform for zooming
+        var canvasInit = this.FindControl<Canvas>("ImageCanvas");
+        if (canvasInit != null && canvasInit.RenderTransform is not ScaleTransform)
+        {
+            canvasInit.RenderTransform = new ScaleTransform(_currentZoom, _currentZoom);
+        }
+        
         // Add pinch gesture support for touchpad zoom
         var canvas = this.FindControl<Canvas>("ImageCanvas");
         if (canvas != null)
@@ -85,9 +92,30 @@ public partial class ImageViewerView : UserControl
                 }
                 else if (args.PropertyName == nameof(ViewModel.ImageData) && ViewModel.ImageData != null)
                 {
-                    // Re-render when ImageData changes (e.g., quality slider)
+                    // Preserve scroll offset around re-render
+                    var scrollViewer = this.FindControl<ScrollViewer>("ImageScrollViewer");
+                    Vector? oldOffset = null;
+                    if (scrollViewer != null)
+                    {
+                        oldOffset = scrollViewer.Offset;
+                    }
+                    
+                    // Re-render when ImageData changes (e.g., processing)
                     System.Diagnostics.Debug.WriteLine($"ImageData changed, rendering: {ViewModel.ImageWidth}x{ViewModel.ImageHeight}");
                     RenderImage(ViewModel.ImageData, ViewModel.ImageWidth, ViewModel.ImageHeight);
+                    
+                    // Restore previous offset if available (clamped to new extent)
+                    if (scrollViewer != null && oldOffset.HasValue)
+                    {
+                        var extent = scrollViewer.Extent;
+                        var viewport = scrollViewer.Viewport;
+                        double newX = Math.Max(0, Math.Min(oldOffset.Value.X, Math.Max(0, extent.Width - viewport.Width)));
+                        double newY = Math.Max(0, Math.Min(oldOffset.Value.Y, Math.Max(0, extent.Height - viewport.Height)));
+                        scrollViewer.Offset = new Vector(newX, newY);
+                    }
+                    
+                    // Re-apply current zoom to ensure transform matches new content
+                    ApplyZoom(ViewModel.ZoomLevel);
                 }
                 else if (args.PropertyName == nameof(ViewModel.HistogramData))
                 {
@@ -815,4 +843,3 @@ public partial class ImageViewerView : UserControl
         }
     }
 }
-

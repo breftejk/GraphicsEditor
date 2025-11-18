@@ -23,6 +23,9 @@ public partial class CanvasView : UserControl
     private IShape? _selectedShape;
     private const double HandleSize = 8.0;
 
+    private BezierCurve? _activeBezier; // currently constructed curve when tool=Bezier
+    private int _activeBezierControlPointIndex = -1; // index of CP being dragged
+
     public CanvasView()
     {
         InitializeComponent();
@@ -40,6 +43,12 @@ public partial class CanvasView : UserControl
                 if (e.PropertyName == nameof(ViewModel.Shapes))
                 {
                     RenderShapes();
+                }
+                
+                // Reset active Bezier construction when changing tool away from Bezier
+                if (e.PropertyName == nameof(ViewModel.SelectedTool) && ViewModel.SelectedTool != DrawingTool.Bezier)
+                {
+                    _activeBezier = null;
                 }
                 
                 // Sync selected shape when ViewModel's SelectedShape changes
@@ -73,6 +82,48 @@ public partial class CanvasView : UserControl
         if (ViewModel == null || _drawingCanvas == null) return;
         
         _startPoint = e.GetPosition(_drawingCanvas);
+
+        // If Bezier tool is active: add a control point on click (start new curve if needed)
+        if (ViewModel.SelectedTool == DrawingTool.Bezier)
+        {
+            if (_activeBezier == null)
+            {
+                _activeBezier = new BezierCurve();
+                _activeBezier.StrokeColor = ViewModel.CurrentStrokeColor;
+                _activeBezier.StrokeThickness = ViewModel.CurrentStrokeThickness;
+                ViewModel.ShapeService.AddShape(_activeBezier);
+                ViewModel.SelectedShape = _activeBezier;
+            }
+            _activeBezier.ControlPoints.Add(new Point2D(_startPoint.X, _startPoint.Y));
+            RenderShapes();
+            return;
+        }
+
+        // If Select tool: prefer grabbing a Bezier control point if near cursor (even if not selected yet)
+        if (ViewModel.SelectedTool == DrawingTool.Select)
+        {
+            for (int si = ViewModel.ShapeService.Shapes.Count - 1; si >= 0; si--)
+            {
+                if (ViewModel.ShapeService.Shapes[si] is BezierCurve bezier)
+                {
+                    for (int i = 0; i < bezier.ControlPoints.Count; i++)
+                    {
+                        var cp = bezier.ControlPoints[i];
+                        if (Math.Abs(cp.X - _startPoint.X) <= 6 && Math.Abs(cp.Y - _startPoint.Y) <= 6)
+                        {
+                            ViewModel.SelectedShape = bezier;
+                            _selectedShape = bezier;
+                            _selectedShape.IsSelected = true;
+                            _activeBezierControlPointIndex = i;
+                            _isDragging = true;
+                            _lastDragPoint = _startPoint;
+                            RenderShapes();
+                            return;
+                        }
+                    }
+                }
+            }
+        }
 
         // Check if we're in Select mode
         if (ViewModel.SelectedTool == DrawingTool.Select)
@@ -131,6 +182,15 @@ public partial class CanvasView : UserControl
 
         var currentPoint = e.GetPosition(_drawingCanvas);
 
+        // Dragging Bezier control point live
+        if (_isDragging && _selectedShape is BezierCurve bez && _activeBezierControlPointIndex >= 0)
+        {
+            bez.ControlPoints[_activeBezierControlPointIndex] = new Point2D(currentPoint.X, currentPoint.Y);
+            _lastDragPoint = currentPoint;
+            RenderShapes();
+            return;
+        }
+
         // Handle resizing
         if (_isResizing && _selectedShape != null && ViewModel != null)
         {
@@ -165,6 +225,15 @@ public partial class CanvasView : UserControl
     private void DrawingCanvas_OnPointerReleased(object? sender, PointerReleasedEventArgs e)
     {
         if (ViewModel == null || _drawingCanvas == null) return;
+
+        // If finishing dragging a Bezier control point
+        if (_isDragging && _selectedShape is BezierCurve && _activeBezierControlPointIndex >= 0)
+        {
+            _isDragging = false;
+            _activeBezierControlPointIndex = -1;
+            ViewModel.UpdateParametersFromSelectedShape();
+            return;
+        }
 
         // Stop resizing
         if (_isResizing)
@@ -246,7 +315,6 @@ public partial class CanvasView : UserControl
                     StrokeThickness = line.IsSelected ? line.StrokeThickness + 2 : line.StrokeThickness
                 };
                 
-                // Add selection highlight
                 if (line.IsSelected)
                 {
                     var highlightLine = new Avalonia.Controls.Shapes.Line
@@ -264,7 +332,6 @@ public partial class CanvasView : UserControl
             }
             else if (shape is Core.Models.Rectangle rect)
             {
-                // Add selection highlight
                 if (rect.IsSelected)
                 {
                     var highlight = new Avalonia.Controls.Shapes.Rectangle
@@ -295,7 +362,6 @@ public partial class CanvasView : UserControl
             }
             else if (shape is Core.Models.Circle circle)
             {
-                // Add selection highlight
                 if (circle.IsSelected)
                 {
                     var highlight = new Ellipse
@@ -324,10 +390,62 @@ public partial class CanvasView : UserControl
                 Canvas.SetTop(ellipse, circle.Center.Y - circle.Radius);
                 _drawingCanvas.Children.Add(ellipse);
             }
+            else if (shape is BezierCurve bez)
+            {
+                // Draw sampled curve as segments
+                var pts = bez.SampleCurve(128);
+                for (int i = 0; i < pts.Count - 1; i++)
+                {
+                    var seg = new Avalonia.Controls.Shapes.Line
+                    {
+                        StartPoint = new Avalonia.Point(pts[i].X, pts[i].Y),
+                        EndPoint = new Avalonia.Point(pts[i + 1].X, pts[i + 1].Y),
+                        Stroke = new SolidColorBrush(Color.FromUInt32(bez.StrokeColor)),
+                        StrokeThickness = bez.IsSelected ? bez.StrokeThickness + 1 : bez.StrokeThickness
+                    };
+                    _drawingCanvas.Children.Add(seg);
+                }
+
+                // Control polygon and points if selected
+                if (bez.IsSelected)
+                {
+                    for (int i = 0; i < bez.ControlPoints.Count - 1; i++)
+                    {
+                        var cp1 = bez.ControlPoints[i];
+                        var cp2 = bez.ControlPoints[i + 1];
+                        var polySeg = new Avalonia.Controls.Shapes.Line
+                        {
+                            StartPoint = new Avalonia.Point(cp1.X, cp1.Y),
+                            EndPoint = new Avalonia.Point(cp2.X, cp2.Y),
+                            Stroke = Brushes.Gray,
+                            StrokeDashArray = new Avalonia.Collections.AvaloniaList<double> { 3, 3 },
+                            StrokeThickness = 1
+                        };
+                        _drawingCanvas.Children.Add(polySeg);
+                    }
+
+                    const double r = 4;
+                    for (int i = 0; i < bez.ControlPoints.Count; i++)
+                    {
+                        var cp = bez.ControlPoints[i];
+                        var dot = new Ellipse
+                        {
+                            Width = r * 2,
+                            Height = r * 2,
+                            Fill = Brushes.White,
+                            Stroke = Brushes.Blue,
+                            StrokeThickness = 2
+                        };
+                        Canvas.SetLeft(dot, cp.X - r);
+                        Canvas.SetTop(dot, cp.Y - r);
+                        _drawingCanvas.Children.Add(dot);
+                    }
+                }
+            }
         }
         
-        // Draw resize handles for selected shape
-        if (_selectedShape != null)
+        // Resize handles for non-Bezier shapes
+        if (_selectedShape != null && _selectedShape is not BezierCurve)
         {
             DrawResizeHandles(_selectedShape);
         }

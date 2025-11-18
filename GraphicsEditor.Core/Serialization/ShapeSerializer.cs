@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using GraphicsEditor.Core.Models;
 
 namespace GraphicsEditor.Core.Serialization;
@@ -12,7 +13,7 @@ public static class ShapeSerializer
     {
         WriteIndented = true,
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
-        Converters = { new System.Text.Json.Serialization.JsonStringEnumConverter() }
+        Converters = { new JsonStringEnumConverter() }
     };
 
     /// <summary>

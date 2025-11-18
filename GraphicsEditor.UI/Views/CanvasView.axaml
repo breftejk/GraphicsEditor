@@ -42,6 +42,8 @@
                                          IsChecked="{Binding SelectedTool, Converter={StaticResource EnumToBoolConverter}, ConverterParameter=Rectangle}"/>
                             <RadioButton Content="Circle" 
                                          IsChecked="{Binding SelectedTool, Converter={StaticResource EnumToBoolConverter}, ConverterParameter=Circle}"/>
+                            <RadioButton Content="Bezier" 
+                                         IsChecked="{Binding SelectedTool, Converter={StaticResource EnumToBoolConverter}, ConverterParameter=Bezier}"/>
                         </StackPanel>
                     </DockPanel>
                 </Border>
@@ -195,6 +197,20 @@
                         <Button Content="Update Selected Circle" Command="{Binding UpdateSelectedShapeCommand}" 
                                 HorizontalAlignment="Stretch" Margin="0,2,0,0"
                                 IsEnabled="{Binding SelectedShape, Converter={StaticResource NullToBoolConverter}}"/>
+                    </StackPanel>
+                </Expander>
+
+                <!-- Bezier Parameters -->
+                <Expander Header="Bezier Parameters" IsVisible="{Binding IsBezierSelected}">
+                    <StackPanel Spacing="5">
+                        <TextBlock Text="Degree (n):" FontWeight="SemiBold"/>
+                        <NumericUpDown Minimum="1" Maximum="10" Value="{Binding BezierDegree}"/>
+                        <TextBlock Text="Control Points (x,y; ...):" FontWeight="SemiBold"/>
+                        <TextBox Text="{Binding BezierPointsText}" AcceptsReturn="True" Height="60" TextWrapping="Wrap"/>
+                        <Button Content="Add/Update Bezier from Params" Command="{Binding AddBezierFromParamsCommand}" HorizontalAlignment="Stretch"/>
+                        <Button Content="Update Selected Bezier" Command="{Binding UpdateSelectedShapeCommand}" HorizontalAlignment="Stretch"/>
+                        <Button Content="Finish Bezier (end adding points)" Command="{Binding FinishBezierCommand}" HorizontalAlignment="Stretch"/>
+                        <TextBlock Text="Tip: With Bezier tool active, click to add exactly n+1 control points, then click Finish." FontSize="11" Foreground="Gray"/>
                     </StackPanel>
                 </Expander>
 

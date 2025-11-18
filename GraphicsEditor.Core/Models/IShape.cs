@@ -6,9 +6,11 @@ namespace GraphicsEditor.Core.Models;
 /// Base interface for all drawable shapes in the graphics editor.
 /// Provides core functionality for shape manipulation, serialization, and rendering.
 /// </summary>
+[JsonPolymorphic(TypeDiscriminatorPropertyName = "$type")] // ensure $type is emitted and read
 [JsonDerivedType(typeof(Line), typeDiscriminator: "line")]
 [JsonDerivedType(typeof(Rectangle), typeDiscriminator: "rectangle")]
 [JsonDerivedType(typeof(Circle), typeDiscriminator: "circle")]
+[JsonDerivedType(typeof(BezierCurve), typeDiscriminator: "bezier")] // added
 public interface IShape : ICloneable
 {
     /// <summary>

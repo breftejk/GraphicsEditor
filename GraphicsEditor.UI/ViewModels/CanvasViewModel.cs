@@ -1,8 +1,9 @@
 using System;
 using System.Collections.ObjectModel;
+using System.Collections.Generic;
 using System.IO;
 using System.Threading.Tasks;
-using System.Windows.Input;
+using System.Linq;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using GraphicsEditor.Core.Models;
@@ -84,11 +85,21 @@ public partial class CanvasViewModel : ViewModelBase
     [ObservableProperty]
     private bool _hasFill = false;
 
+    // Bezier parameters
+    [ObservableProperty]
+    private int _bezierDegree = 3; // default cubic
+
+    [ObservableProperty]
+    private string _bezierPointsText = "100,100; 150,50; 250,150; 300,100";
+
     // Mouse interaction state
     private Point2D? _drawingStartPoint;
     private IShape? _tempShape;
     private bool _isDragging;
     private Point2D _dragStartPoint;
+
+    // Selected control point index for dragging, -1 if moving whole curve
+    private int _activeControlPointIndex = -1;
 
     public CanvasViewModel()
     {
@@ -161,17 +172,28 @@ public partial class CanvasViewModel : ViewModelBase
             CurrentFillColor = circle.FillColor;
             HasFill = circle.FillColor.HasValue;
         }
+        else if (value is BezierCurve bez)
+        {
+            BezierDegree = Math.Max(0, bez.Degree);
+            BezierPointsText = string.Join("; ", bez.ControlPoints.Select(p => string.Format(System.Globalization.CultureInfo.InvariantCulture, "{0:F1},{1:F1}", p.X, p.Y)));
+            CurrentStrokeColor = bez.StrokeColor;
+            CurrentStrokeThickness = bez.StrokeThickness;
+            CurrentFillColor = null;
+            HasFill = false;
+        }
         
         // Notify properties for visibility
         OnPropertyChanged(nameof(IsLineSelected));
         OnPropertyChanged(nameof(IsRectangleSelected));
         OnPropertyChanged(nameof(IsCircleSelected));
+        OnPropertyChanged(nameof(IsBezierSelected));
     }
     
     // Properties to control visibility of parameter sections
     public bool IsLineSelected => SelectedShape is Line || SelectedShape == null;
     public bool IsRectangleSelected => SelectedShape is Core.Models.Rectangle || SelectedShape == null;
     public bool IsCircleSelected => SelectedShape is Circle || SelectedShape == null;
+    public bool IsBezierSelected => SelectedShape is BezierCurve || SelectedShape == null;
 
     [RelayCommand]
     private void AddLineFromParams()
@@ -233,6 +255,25 @@ public partial class CanvasViewModel : ViewModelBase
         {
             StatusMessage = "Invalid circle parameters";
         }
+    }
+
+    [RelayCommand]
+    private void AddBezierFromParams()
+    {
+        var points = ParseBezierPoints(BezierPointsText);
+        int required = BezierDegree + 1;
+        if (points.Count != required)
+        {
+            StatusMessage = $"Bezier requires exactly {required} control points for degree {BezierDegree}";
+            return;
+        }
+        var curve = new BezierCurve(points)
+        {
+            StrokeColor = CurrentStrokeColor,
+            StrokeThickness = CurrentStrokeThickness
+        };
+        _shapeService.AddShape(curve);
+        StatusMessage = $"Added Bezier deg {curve.Degree} with {curve.ControlPoints.Count} pts";
     }
 
     [RelayCommand]
@@ -403,6 +444,19 @@ public partial class CanvasViewModel : ViewModelBase
                     return;
                 }
             }
+            else if (SelectedShape is BezierCurve bez)
+            {
+                var pts = ParseBezierPoints(BezierPointsText);
+                if (pts.Count < 2)
+                {
+                    StatusMessage = "Invalid bezier points";
+                    return;
+                }
+                bez.ControlPoints.Clear();
+                foreach (var p in pts) bez.ControlPoints.Add(p);
+                OnPropertyChanged(nameof(Shapes));
+                StatusMessage = "Bezier updated";
+            }
         }
         catch (Exception ex)
         {
@@ -433,6 +487,21 @@ public partial class CanvasViewModel : ViewModelBase
                 StatusMessage = "Selection cleared";
             }
         }
+        else if (SelectedTool == DrawingTool.Bezier)
+        {
+            // Start new curve if none is selected while drawing
+            if (_tempShape is not BezierCurve temp)
+            {
+                temp = new BezierCurve();
+                temp.StrokeColor = CurrentStrokeColor;
+                temp.StrokeThickness = CurrentStrokeThickness;
+                _tempShape = temp;
+                _shapeService.AddShape(temp);
+            }
+            ((BezierCurve)_tempShape).AddPoint(point);
+            StatusMessage = $"Added control point ({x:F1},{y:F1})";
+            return;
+        }
         else
         {
             _drawingStartPoint = point;
@@ -445,6 +514,26 @@ public partial class CanvasViewModel : ViewModelBase
     public void OnMouseMove(double x, double y)
     {
         var point = new Point2D(x, y);
+
+        if (SelectedTool == DrawingTool.Bezier && _tempShape is BezierCurve temp)
+        {
+            // Real-time preview by updating last point if mouse is moving while dragging
+            if (temp.ControlPoints.Count > 0)
+            {
+                temp.ControlPoints[temp.ControlPoints.Count - 1] = point;
+                OnPropertyChanged(nameof(Shapes));
+            }
+            return;
+        }
+
+        // Drag control point if selected
+        if (_isDragging && SelectedShape is BezierCurve bez && _activeControlPointIndex >= 0)
+        {
+            bez.ControlPoints[_activeControlPointIndex] = point;
+            _dragStartPoint = point;
+            OnPropertyChanged(nameof(Shapes));
+            return;
+        }
 
         if (_isDragging && SelectedShape != null && SelectedTool == DrawingTool.Select)
         {
@@ -466,6 +555,12 @@ public partial class CanvasViewModel : ViewModelBase
     public void OnMouseUp(double x, double y)
     {
         var point = new Point2D(x, y);
+
+        if (SelectedTool == DrawingTool.Bezier)
+        {
+            // Keep the newly added point; user keeps clicking to add more. End with right click or tool change.
+            return;
+        }
 
         if (_isDragging)
         {
@@ -546,6 +641,51 @@ public partial class CanvasViewModel : ViewModelBase
             CircleY = circle.Center.Y.ToString("F1");
             CircleRadius = circle.Radius.ToString("F1");
         }
+        else if (SelectedShape is BezierCurve bez)
+        {
+            BezierDegree = Math.Max(0, bez.Degree);
+            BezierPointsText = string.Join("; ", bez.ControlPoints.Select(p => string.Format(System.Globalization.CultureInfo.InvariantCulture, "{0:F1},{1:F1}", p.X, p.Y)));
+        }
+    }
+
+    [RelayCommand]
+    private void FinishBezier()
+    {
+        if (_tempShape is BezierCurve temp)
+        {
+            int required = BezierDegree + 1;
+            if (temp.ControlPoints.Count == required)
+            {
+                _tempShape = null;
+                StatusMessage = $"Bezier created with {temp.ControlPoints.Count} points (deg {temp.Degree})";
+            }
+            else
+            {
+                StatusMessage = $"Bezier requires exactly {required} control points (currently {temp.ControlPoints.Count})";
+            }
+        }
+        else
+        {
+            StatusMessage = "No active Bezier to finish";
+        }
+    }
+
+    private List<Point2D> ParseBezierPoints(string text)
+    {
+        var result = new List<Point2D>();
+        if (string.IsNullOrWhiteSpace(text)) return result;
+        var parts = text.Split(new[] { ';' }, StringSplitOptions.RemoveEmptyEntries);
+        foreach (var part in parts)
+        {
+            var xy = part.Trim().Split(',');
+            if (xy.Length == 2 
+                && double.TryParse(xy[0], System.Globalization.NumberFormatInfo.InvariantInfo, out double x) 
+                && double.TryParse(xy[1], System.Globalization.NumberFormatInfo.InvariantInfo, out double y))
+            {
+                result.Add(new Point2D(x, y));
+            }
+        }
+        return result;
     }
 }
 
@@ -554,5 +694,6 @@ public enum DrawingTool
     Select,
     Line,
     Rectangle,
-    Circle
+    Circle,
+    Bezier // new
 }

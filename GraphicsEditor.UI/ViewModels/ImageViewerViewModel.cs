@@ -371,8 +371,8 @@ public partial class ImageViewerViewModel : ViewModelBase
         
         try
         {
-            // Apply to current image (stack operation)
-            _imageService.LoadImage(ImageData, ImageWidth, ImageHeight);
+            // Use current image data without resetting viewport
+            _imageService.UpdateImageData(ImageData);
             var result = _imageService.AddValue(AddValue);
             ApplyProcessedImage(result, $"Add: {AddValue}");
         }
@@ -389,8 +389,7 @@ public partial class ImageViewerViewModel : ViewModelBase
         
         try
         {
-            // Apply to current image (stack operation)
-            _imageService.LoadImage(ImageData, ImageWidth, ImageHeight);
+            _imageService.UpdateImageData(ImageData);
             var result = _imageService.SubtractValue(SubtractValue);
             ApplyProcessedImage(result, $"Subtract: {SubtractValue}");
         }
@@ -407,8 +406,7 @@ public partial class ImageViewerViewModel : ViewModelBase
         
         try
         {
-            // Apply to current image (stack operation)
-            _imageService.LoadImage(ImageData, ImageWidth, ImageHeight);
+            _imageService.UpdateImageData(ImageData);
             var result = _imageService.MultiplyValue(MultiplyValue);
             ApplyProcessedImage(result, $"Multiply: {MultiplyValue:F2}");
         }
@@ -425,8 +423,7 @@ public partial class ImageViewerViewModel : ViewModelBase
         
         try
         {
-            // Apply to current image (stack operation)
-            _imageService.LoadImage(ImageData, ImageWidth, ImageHeight);
+            _imageService.UpdateImageData(ImageData);
             var result = _imageService.DivideValue(DivideValue);
             ApplyProcessedImage(result, $"Divide: {DivideValue:F2}");
         }
@@ -443,8 +440,7 @@ public partial class ImageViewerViewModel : ViewModelBase
         
         try
         {
-            // Apply to current image (stack operation)
-            _imageService.LoadImage(ImageData, ImageWidth, ImageHeight);
+            _imageService.UpdateImageData(ImageData);
             var result = _imageService.ChangeBrightness(BrightnessLevel);
             ApplyProcessedImage(result, $"Brightness: {BrightnessLevel}");
         }
@@ -461,8 +457,7 @@ public partial class ImageViewerViewModel : ViewModelBase
         
         try
         {
-            // Apply to current image (stack operation)
-            _imageService.LoadImage(ImageData, ImageWidth, ImageHeight);
+            _imageService.UpdateImageData(ImageData);
             var result = _imageService.ToGrayscaleAverage();
             ApplyProcessedImage(result, "Grayscale (Average)");
         }
@@ -479,8 +474,7 @@ public partial class ImageViewerViewModel : ViewModelBase
         
         try
         {
-            // Apply to current image (stack operation)
-            _imageService.LoadImage(ImageData, ImageWidth, ImageHeight);
+            _imageService.UpdateImageData(ImageData);
             var result = _imageService.ToGrayscaleLuminosity();
             ApplyProcessedImage(result, "Grayscale (Luminosity)");
         }
@@ -501,8 +495,7 @@ public partial class ImageViewerViewModel : ViewModelBase
         
         try
         {
-            // Apply to current image (stack operation)
-            _imageService.LoadImage(ImageData, ImageWidth, ImageHeight);
+            _imageService.UpdateImageData(ImageData);
             var result = _imageService.ApplySmoothingFilter(SmoothingKernelSize);
             ApplyProcessedImage(result, $"Smoothing (kernel: {SmoothingKernelSize})");
         }
@@ -519,8 +512,7 @@ public partial class ImageViewerViewModel : ViewModelBase
         
         try
         {
-            // Apply to current image (stack operation)
-            _imageService.LoadImage(ImageData, ImageWidth, ImageHeight);
+            _imageService.UpdateImageData(ImageData);
             var result = _imageService.ApplyMedianFilter(MedianKernelSize);
             ApplyProcessedImage(result, $"Median (kernel: {MedianKernelSize})");
         }
@@ -537,8 +529,7 @@ public partial class ImageViewerViewModel : ViewModelBase
         
         try
         {
-            // Apply to current image (stack operation)
-            _imageService.LoadImage(ImageData, ImageWidth, ImageHeight);
+            _imageService.UpdateImageData(ImageData);
             var result = _imageService.ApplySobelFilter();
             ApplyProcessedImage(result, "Sobel Edge Detection");
         }
@@ -555,8 +546,7 @@ public partial class ImageViewerViewModel : ViewModelBase
         
         try
         {
-            // Apply to current image (stack operation)
-            _imageService.LoadImage(ImageData, ImageWidth, ImageHeight);
+            _imageService.UpdateImageData(ImageData);
             var result = _imageService.ApplySharpeningFilter();
             ApplyProcessedImage(result, "Sharpening");
         }
@@ -573,8 +563,7 @@ public partial class ImageViewerViewModel : ViewModelBase
         
         try
         {
-            // Apply to current image (stack operation)
-            _imageService.LoadImage(ImageData, ImageWidth, ImageHeight);
+            _imageService.UpdateImageData(ImageData);
             var result = _imageService.ApplyGaussianBlur(GaussianSigma);
             ApplyProcessedImage(result, $"Gaussian Blur (sigma: {GaussianSigma:F2})");
         }
@@ -591,11 +580,144 @@ public partial class ImageViewerViewModel : ViewModelBase
         
         try
         {
-            // Apply to current image (stack operation)
-            _imageService.LoadImage(ImageData, ImageWidth, ImageHeight);
+            _imageService.UpdateImageData(ImageData);
             var kernel = ParseCustomKernel(CustomKernelInput);
             var result = _imageService.ApplyConvolution(kernel);
             ApplyProcessedImage(result, $"Custom Kernel ({kernel.GetLength(0)}x{kernel.GetLength(1)})");
+        }
+        catch (Exception ex)
+        {
+            StatusMessage = $"Error: {ex.Message}";
+        }
+    }
+
+    // ============================================
+    // HISTOGRAM
+    // ============================================
+    [RelayCommand]
+    private void ApplyHistogramStretching()
+    {
+        if (!IsImageLoaded || ImageData == null) return;
+        try
+        {
+            _imageService.UpdateImageData(ImageData);
+            var result = _imageService.HistogramStretching();
+            ApplyProcessedImage(result, "Histogram Stretching");
+        }
+        catch (Exception ex)
+        {
+            StatusMessage = $"Error: {ex.Message}";
+        }
+    }
+
+    [RelayCommand]
+    private void ApplyHistogramEqualization()
+    {
+        if (!IsImageLoaded || ImageData == null) return;
+        try
+        {
+            _imageService.UpdateImageData(ImageData);
+            var result = _imageService.HistogramEqualization();
+            ApplyProcessedImage(result, "Histogram Equalization");
+        }
+        catch (Exception ex)
+        {
+            StatusMessage = $"Error: {ex.Message}";
+        }
+    }
+
+    // ============================================
+    // BINARIZATION
+    // ============================================
+    [RelayCommand]
+    private void ApplyBinarizeManual()
+    {
+        if (!IsImageLoaded || ImageData == null) return;
+        try
+        {
+            _imageService.UpdateImageData(ImageData);
+            var result = _imageService.BinarizeManual(ManualThreshold);
+            ApplyProcessedImage(result, $"Binarization (Manual: {ManualThreshold})");
+        }
+        catch (Exception ex)
+        {
+            StatusMessage = $"Error: {ex.Message}";
+        }
+    }
+
+    [RelayCommand]
+    private void ApplyBinarizePercentBlack()
+    {
+        if (!IsImageLoaded || ImageData == null) return;
+        try
+        {
+            _imageService.UpdateImageData(ImageData);
+            var result = _imageService.BinarizePercentBlack(PercentBlack);
+            ApplyProcessedImage(result, $"Binarization (Percent Black: {PercentBlack:F1}%)");
+        }
+        catch (Exception ex)
+        {
+            StatusMessage = $"Error: {ex.Message}";
+        }
+    }
+
+    [RelayCommand]
+    private void ApplyBinarizeMeanIterative()
+    {
+        if (!IsImageLoaded || ImageData == null) return;
+        try
+        {
+            _imageService.UpdateImageData(ImageData);
+            var result = _imageService.BinarizeMeanIterative();
+            ApplyProcessedImage(result, "Binarization (Mean Iterative Selection)");
+        }
+        catch (Exception ex)
+        {
+            StatusMessage = $"Error: {ex.Message}";
+        }
+    }
+
+    [RelayCommand]
+    private void ApplyBinarizeEntropy()
+    {
+        if (!IsImageLoaded || ImageData == null) return;
+        try
+        {
+            _imageService.UpdateImageData(ImageData);
+            var result = _imageService.BinarizeEntropy();
+            ApplyProcessedImage(result, "Binarization (Entropy Selection)");
+        }
+        catch (Exception ex)
+        {
+            StatusMessage = $"Error: {ex.Message}";
+        }
+    }
+
+    [RelayCommand]
+    private void ApplyBinarizeMinimumError()
+    {
+        if (!IsImageLoaded || ImageData == null) return;
+        try
+        {
+            _imageService.UpdateImageData(ImageData);
+            var result = _imageService.BinarizeMinimumError();
+            ApplyProcessedImage(result, "Binarization (Minimum Error)");
+        }
+        catch (Exception ex)
+        {
+            StatusMessage = $"Error: {ex.Message}";
+        }
+    }
+
+    [RelayCommand]
+    private void ApplyBinarizeFuzzyMinimumError()
+    {
+        if (!IsImageLoaded || ImageData == null) return;
+        try
+        {
+            _imageService.UpdateImageData(ImageData);
+            var result = _imageService.BinarizeFuzzyMinimumError();
+            ApplyProcessedImage(result, "Binarization (Fuzzy Minimum Error)");
         }
         catch (Exception ex)
         {
@@ -608,8 +730,19 @@ public partial class ImageViewerViewModel : ViewModelBase
     {
         if (_originalImageData != null)
         {
+            // Preserve zoom and pan
+            var currentZoom = _imageService.ZoomLevel;
+            var currentPanX = _imageService.PanX;
+            var currentPanY = _imageService.PanY;
+
             ImageData = (byte[])_originalImageData.Clone();
-            _imageService.LoadImage(ImageData, ImageWidth, ImageHeight);
+            _imageService.UpdateImageData(ImageData);
+
+            // Restore viewport
+            _imageService.SetZoom(currentZoom);
+            _imageService.SetPan(currentPanX, currentPanY);
+            ZoomLevel = currentZoom;
+
             StatusMessage = "Reset to original";
             
             // Clear history when resetting to original
@@ -618,6 +751,9 @@ public partial class ImageViewerViewModel : ViewModelBase
             
             // Reset all parameters to default
             ResetAllFiltersAndTransformations();
+
+            // Update histogram
+            UpdateHistogram();
         }
     }
 
@@ -626,12 +762,25 @@ public partial class ImageViewerViewModel : ViewModelBase
     {
         if (_imageHistory.Count > 0)
         {
+            // Preserve zoom and pan
+            var currentZoom = _imageService.ZoomLevel;
+            var currentPanX = _imageService.PanX;
+            var currentPanY = _imageService.PanY;
+
             // Restore previous image from history
             ImageData = _imageHistory.Pop();
-            _imageService.LoadImage(ImageData, ImageWidth, ImageHeight);
+            _imageService.UpdateImageData(ImageData);
             
+            // Restore viewport
+            _imageService.SetZoom(currentZoom);
+            _imageService.SetPan(currentPanX, currentPanY);
+            ZoomLevel = currentZoom;
+
             CanUndo = _imageHistory.Count > 0;
             StatusMessage = $"Undo applied. History: {_imageHistory.Count} steps";
+
+            // Update histogram
+            UpdateHistogram();
         }
     }
 
@@ -707,7 +856,7 @@ public partial class ImageViewerViewModel : ViewModelBase
 
         try
         {
-            _imageService.LoadImage(ImageData, ImageWidth, ImageHeight);
+            // Do NOT call LoadImage here (it resets zoom/pan). Just compute the histogram from current data.
             HistogramData = _imageService.CalculateHistogram(ImageData, -1); // -1 for grayscale average
             HasHistogramData = true;
         }
@@ -752,149 +901,5 @@ public partial class ImageViewerViewModel : ViewModelBase
         }
 
         return kernel;
-    }
-
-    // ============================================
-    // HISTOGRAM OPERATIONS
-    // ============================================
-
-    [RelayCommand]
-    private void ApplyHistogramStretching()
-    {
-        if (!IsImageLoaded || ImageData == null) return;
-        
-        try
-        {
-            _imageService.LoadImage(ImageData, ImageWidth, ImageHeight);
-            var result = _imageService.HistogramStretching();
-            ApplyProcessedImage(result, "Histogram Stretching");
-        }
-        catch (Exception ex)
-        {
-            StatusMessage = $"Error: {ex.Message}";
-        }
-    }
-
-    [RelayCommand]
-    private void ApplyHistogramEqualization()
-    {
-        if (!IsImageLoaded || ImageData == null) return;
-        
-        try
-        {
-            _imageService.LoadImage(ImageData, ImageWidth, ImageHeight);
-            var result = _imageService.HistogramEqualization();
-            ApplyProcessedImage(result, "Histogram Equalization");
-        }
-        catch (Exception ex)
-        {
-            StatusMessage = $"Error: {ex.Message}";
-        }
-    }
-
-    // ============================================
-    // BINARIZATION OPERATIONS
-    // ============================================
-
-    [RelayCommand]
-    private void ApplyBinarizeManual()
-    {
-        if (!IsImageLoaded || ImageData == null) return;
-        
-        try
-        {
-            _imageService.LoadImage(ImageData, ImageWidth, ImageHeight);
-            var result = _imageService.BinarizeManual(ManualThreshold);
-            ApplyProcessedImage(result, $"Binarization (Manual: {ManualThreshold})");
-        }
-        catch (Exception ex)
-        {
-            StatusMessage = $"Error: {ex.Message}";
-        }
-    }
-
-    [RelayCommand]
-    private void ApplyBinarizePercentBlack()
-    {
-        if (!IsImageLoaded || ImageData == null) return;
-        
-        try
-        {
-            _imageService.LoadImage(ImageData, ImageWidth, ImageHeight);
-            var result = _imageService.BinarizePercentBlack(PercentBlack);
-            ApplyProcessedImage(result, $"Binarization (Percent Black: {PercentBlack:F1}%)");
-        }
-        catch (Exception ex)
-        {
-            StatusMessage = $"Error: {ex.Message}";
-        }
-    }
-
-    [RelayCommand]
-    private void ApplyBinarizeMeanIterative()
-    {
-        if (!IsImageLoaded || ImageData == null) return;
-        
-        try
-        {
-            _imageService.LoadImage(ImageData, ImageWidth, ImageHeight);
-            var result = _imageService.BinarizeMeanIterative();
-            ApplyProcessedImage(result, "Binarization (Mean Iterative Selection)");
-        }
-        catch (Exception ex)
-        {
-            StatusMessage = $"Error: {ex.Message}";
-        }
-    }
-
-    [RelayCommand]
-    private void ApplyBinarizeEntropy()
-    {
-        if (!IsImageLoaded || ImageData == null) return;
-        
-        try
-        {
-            _imageService.LoadImage(ImageData, ImageWidth, ImageHeight);
-            var result = _imageService.BinarizeEntropy();
-            ApplyProcessedImage(result, "Binarization (Entropy Selection)");
-        }
-        catch (Exception ex)
-        {
-            StatusMessage = $"Error: {ex.Message}";
-        }
-    }
-
-    [RelayCommand]
-    private void ApplyBinarizeMinimumError()
-    {
-        if (!IsImageLoaded || ImageData == null) return;
-        
-        try
-        {
-            _imageService.LoadImage(ImageData, ImageWidth, ImageHeight);
-            var result = _imageService.BinarizeMinimumError();
-            ApplyProcessedImage(result, "Binarization (Minimum Error)");
-        }
-        catch (Exception ex)
-        {
-            StatusMessage = $"Error: {ex.Message}";
-        }
-    }
-
-    [RelayCommand]
-    private void ApplyBinarizeFuzzyMinimumError()
-    {
-        if (!IsImageLoaded || ImageData == null) return;
-        
-        try
-        {
-            _imageService.LoadImage(ImageData, ImageWidth, ImageHeight);
-            var result = _imageService.BinarizeFuzzyMinimumError();
-            ApplyProcessedImage(result, "Binarization (Fuzzy Minimum Error)");
-        }
-        catch (Exception ex)
-        {
-            StatusMessage = $"Error: {ex.Message}";
-        }
     }
 }

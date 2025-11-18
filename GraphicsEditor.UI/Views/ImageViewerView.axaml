@@ -183,6 +183,84 @@
                                        FontSize="10" Foreground="Gray" TextWrapping="Wrap"/>
                         </StackPanel>
                     </Expander>
+
+                    <!-- Histogram Operations -->
+                    <Expander Header="Histogram Operations" IsExpanded="False">
+                        <StackPanel Spacing="8" Margin="5">
+                            <TextBlock Text="Histogram Stretching:" FontWeight="SemiBold"/>
+                            <Button Content="Apply Histogram Stretching" Command="{Binding ApplyHistogramStretchingCommand}" 
+                                    IsEnabled="{Binding IsImageLoaded}" HorizontalAlignment="Stretch"/>
+                            <TextBlock Text="Expands the range of intensities to 0-255" 
+                                       FontSize="10" Foreground="Gray" TextWrapping="Wrap"/>
+                            
+                            <Separator Margin="0,10"/>
+                            
+                            <TextBlock Text="Histogram Equalization:" FontWeight="SemiBold"/>
+                            <Button Content="Apply Histogram Equalization" Command="{Binding ApplyHistogramEqualizationCommand}" 
+                                    IsEnabled="{Binding IsImageLoaded}" HorizontalAlignment="Stretch"/>
+                            <TextBlock Text="Improves contrast by redistributing intensities" 
+                                       FontSize="10" Foreground="Gray" TextWrapping="Wrap"/>
+                        </StackPanel>
+                    </Expander>
+
+                    <!-- Binarization -->
+                    <Expander Header="Binarization" IsExpanded="False">
+                        <StackPanel Spacing="8" Margin="5">
+                            <!-- Manual Threshold -->
+                            <TextBlock Text="1. Manual Threshold:" FontWeight="SemiBold"/>
+                            <Grid ColumnDefinitions="*,Auto">
+                                <NumericUpDown Grid.Column="0" Value="{Binding ManualThreshold}" Minimum="0" Maximum="255" Increment="1"
+                                              IsEnabled="{Binding IsImageLoaded}"/>
+                                <Button Grid.Column="1" Content="Apply" Command="{Binding ApplyBinarizeManualCommand}" 
+                                        IsEnabled="{Binding IsImageLoaded}" Margin="5,0,0,0"/>
+                            </Grid>
+                            <TextBlock Text="User-defined threshold (0-255)" FontSize="10" Foreground="Gray"/>
+                            
+                            <Separator Margin="0,10"/>
+                            
+                            <!-- Percent Black Selection -->
+                            <TextBlock Text="2. Percent Black Selection:" FontWeight="SemiBold"/>
+                            <Grid ColumnDefinitions="*,Auto">
+                                <NumericUpDown Grid.Column="0" Value="{Binding PercentBlack}" Minimum="0" Maximum="100" 
+                                              Increment="1" FormatString="F1" IsEnabled="{Binding IsImageLoaded}"/>
+                                <Button Grid.Column="1" Content="Apply" Command="{Binding ApplyBinarizePercentBlackCommand}" 
+                                        IsEnabled="{Binding IsImageLoaded}" Margin="5,0,0,0"/>
+                            </Grid>
+                            <TextBlock Text="Percentage of pixels to be black (0-100%)" FontSize="10" Foreground="Gray"/>
+                            
+                            <Separator Margin="0,10"/>
+                            
+                            <!-- Mean Iterative Selection -->
+                            <TextBlock Text="3. Mean Iterative Selection:" FontWeight="SemiBold"/>
+                            <Button Content="Apply Mean Iterative" Command="{Binding ApplyBinarizeMeanIterativeCommand}" 
+                                    IsEnabled="{Binding IsImageLoaded}" HorizontalAlignment="Stretch"/>
+                            <TextBlock Text="Iterative method (Isodata algorithm)" FontSize="10" Foreground="Gray"/>
+                            
+                            <Separator Margin="0,10"/>
+                            
+                            <!-- Entropy Selection -->
+                            <TextBlock Text="4. Entropy Selection:" FontWeight="SemiBold"/>
+                            <Button Content="Apply Entropy Selection" Command="{Binding ApplyBinarizeEntropyCommand}" 
+                                    IsEnabled="{Binding IsImageLoaded}" HorizontalAlignment="Stretch"/>
+                            <TextBlock Text="Kapur method - maximizes entropy" FontSize="10" Foreground="Gray"/>
+                            
+                            <Separator Margin="0,10"/>
+                            
+                            <!-- Minimum Error -->
+                            <TextBlock Text="5. Minimum Error:" FontWeight="SemiBold"/>
+                            <Button Content="Apply Minimum Error" Command="{Binding ApplyBinarizeMinimumErrorCommand}" 
+                                    IsEnabled="{Binding IsImageLoaded}" HorizontalAlignment="Stretch"/>
+                            <TextBlock Text="Kittler-Illingworth method" FontSize="10" Foreground="Gray"/>
+                            
+                            <Separator Margin="0,10"/>
+                            
+                            <!-- Fuzzy Minimum Error -->
+                            <TextBlock Text="6. Fuzzy Minimum Error:" FontWeight="SemiBold"/>
+                            <Button Content="Apply Fuzzy Min Error" Command="{Binding ApplyBinarizeFuzzyMinimumErrorCommand}" 
+                                    IsEnabled="{Binding IsImageLoaded}" HorizontalAlignment="Stretch"/>
+                            <TextBlock Text="Fuzzy set theory extension" FontSize="10" Foreground="Gray"/>
+                        </StackPanel>
+                    </Expander>
                     
                     <!-- Undo and Reset Buttons -->
                     <Button Content="↶ Cofnij ostatni filtr" Command="{Binding UndoLastFilterCommand}" 
@@ -252,13 +330,21 @@
                         <TextBlock DockPanel.Dock="Top" Text="Pixel Inspector" FontWeight="Bold" Margin="8,4" Background="#F0F0F0"/>
                         <StackPanel Spacing="5" Margin="8">
                             <TextBlock Text="{Binding PixelInfo}" TextWrapping="Wrap"/>
-                            <Border Height="60" BorderBrush="Black" BorderThickness="1" Margin="0,5,0,0">
-                                <Border.Background>
-                                    <SolidColorBrush Color="Transparent"/>
-                                    <!-- Will show selected pixel color -->
-                                </Border.Background>
+                            <Border Height="60" BorderBrush="Black" BorderThickness="1" Margin="0,5,0,0"
+                                    Background="{Binding SelectedPixelColorBrush}">
                             </Border>
                         </StackPanel>
+                    </DockPanel>
+                </Border>
+
+                <!-- Histogram Visualization -->
+                <Border BorderBrush="Gray" BorderThickness="1" CornerRadius="4" IsVisible="{Binding HasHistogramData}">
+                    <DockPanel>
+                        <TextBlock DockPanel.Dock="Top" Text="Histogram" FontWeight="Bold" Margin="8,4" Background="#F0F0F0"/>
+                        <Canvas Name="HistogramCanvas" Height="120" Margin="8" Background="White" 
+                                HorizontalAlignment="Stretch" ClipToBounds="True">
+                            <!-- Histogram will be drawn here -->
+                        </Canvas>
                     </DockPanel>
                 </Border>
 
@@ -271,6 +357,7 @@
                             <TextBlock Text="• Click on image to inspect pixel" TextWrapping="Wrap"/>
                             <TextBlock Text="• Drag to pan when zoomed" TextWrapping="Wrap"/>
                             <TextBlock Text="• Adjust quality before saving JPEG" TextWrapping="Wrap"/>
+                            <TextBlock Text="• Histogram updates with operations" TextWrapping="Wrap" FontWeight="SemiBold"/>
                         </StackPanel>
                     </DockPanel>
                 </Border>

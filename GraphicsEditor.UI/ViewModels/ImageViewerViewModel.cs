@@ -57,6 +57,11 @@ public partial class ImageViewerViewModel : ViewModelBase
         }
     }
 
+    partial void OnSelectedPixelColorChanged(RgbColor? value)
+    {
+        OnPropertyChanged(nameof(SelectedPixelColorBrush));
+    }
+
     [ObservableProperty]
     private string _loadedFilePath = "";
 
@@ -71,6 +76,21 @@ public partial class ImageViewerViewModel : ViewModelBase
 
     [ObservableProperty]
     private string _pixelInfo = "";
+    
+    // Computed property for pixel color brush
+    public Avalonia.Media.SolidColorBrush? SelectedPixelColorBrush
+    {
+        get
+        {
+            if (SelectedPixelColor.HasValue)
+            {
+                var color = SelectedPixelColor.Value;
+                return new Avalonia.Media.SolidColorBrush(
+                    Avalonia.Media.Color.FromRgb(color.R, color.G, color.B));
+            }
+            return new Avalonia.Media.SolidColorBrush(Avalonia.Media.Colors.Transparent);
+        }
+    }
 
     [ObservableProperty]
     private bool _isImageLoaded = false;
@@ -106,6 +126,20 @@ public partial class ImageViewerViewModel : ViewModelBase
 
     [ObservableProperty]
     private string _customKernelInput = "0,-1,0\n-1,5,-1\n0,-1,0";
+
+    // Binarization parameters
+    [ObservableProperty]
+    private int _manualThreshold = 128;
+
+    [ObservableProperty]
+    private double _percentBlack = 50.0;
+
+    // Histogram data for visualization
+    [ObservableProperty]
+    private int[]? _histogramData;
+
+    [ObservableProperty]
+    private bool _hasHistogramData = false;
 
     public ImageViewerViewModel()
     {
@@ -241,6 +275,9 @@ public partial class ImageViewerViewModel : ViewModelBase
             
             // Reset all filters and transformations to default values
             ResetAllFiltersAndTransformations();
+            
+            // Update histogram
+            UpdateHistogram();
         }
         catch (Exception ex)
         {
@@ -616,6 +653,10 @@ public partial class ImageViewerViewModel : ViewModelBase
         GaussianSigma = 1.0;
         CustomKernelInput = "0,-1,0\n-1,5,-1\n0,-1,0";
         
+        // Binarization parameters
+        ManualThreshold = 128;
+        PercentBlack = 50.0;
+        
         // JPEG quality
         JpegQuality = 100;
     }
@@ -647,6 +688,34 @@ public partial class ImageViewerViewModel : ViewModelBase
         ZoomLevel = currentZoom;
         
         StatusMessage = message + $" (History: {_imageHistory.Count} steps)";
+        
+        // Update histogram after processing
+        UpdateHistogram();
+    }
+
+    /// <summary>
+    /// Updates the histogram data from current image.
+    /// </summary>
+    private void UpdateHistogram()
+    {
+        if (ImageData == null || ImageWidth == 0 || ImageHeight == 0)
+        {
+            HistogramData = null;
+            HasHistogramData = false;
+            return;
+        }
+
+        try
+        {
+            _imageService.LoadImage(ImageData, ImageWidth, ImageHeight);
+            HistogramData = _imageService.CalculateHistogram(ImageData, -1); // -1 for grayscale average
+            HasHistogramData = true;
+        }
+        catch (Exception ex)
+        {
+            StatusMessage = $"Error calculating histogram: {ex.Message}";
+            HasHistogramData = false;
+        }
     }
 
     /// <summary>
@@ -684,5 +753,148 @@ public partial class ImageViewerViewModel : ViewModelBase
 
         return kernel;
     }
-}
 
+    // ============================================
+    // HISTOGRAM OPERATIONS
+    // ============================================
+
+    [RelayCommand]
+    private void ApplyHistogramStretching()
+    {
+        if (!IsImageLoaded || ImageData == null) return;
+        
+        try
+        {
+            _imageService.LoadImage(ImageData, ImageWidth, ImageHeight);
+            var result = _imageService.HistogramStretching();
+            ApplyProcessedImage(result, "Histogram Stretching");
+        }
+        catch (Exception ex)
+        {
+            StatusMessage = $"Error: {ex.Message}";
+        }
+    }
+
+    [RelayCommand]
+    private void ApplyHistogramEqualization()
+    {
+        if (!IsImageLoaded || ImageData == null) return;
+        
+        try
+        {
+            _imageService.LoadImage(ImageData, ImageWidth, ImageHeight);
+            var result = _imageService.HistogramEqualization();
+            ApplyProcessedImage(result, "Histogram Equalization");
+        }
+        catch (Exception ex)
+        {
+            StatusMessage = $"Error: {ex.Message}";
+        }
+    }
+
+    // ============================================
+    // BINARIZATION OPERATIONS
+    // ============================================
+
+    [RelayCommand]
+    private void ApplyBinarizeManual()
+    {
+        if (!IsImageLoaded || ImageData == null) return;
+        
+        try
+        {
+            _imageService.LoadImage(ImageData, ImageWidth, ImageHeight);
+            var result = _imageService.BinarizeManual(ManualThreshold);
+            ApplyProcessedImage(result, $"Binarization (Manual: {ManualThreshold})");
+        }
+        catch (Exception ex)
+        {
+            StatusMessage = $"Error: {ex.Message}";
+        }
+    }
+
+    [RelayCommand]
+    private void ApplyBinarizePercentBlack()
+    {
+        if (!IsImageLoaded || ImageData == null) return;
+        
+        try
+        {
+            _imageService.LoadImage(ImageData, ImageWidth, ImageHeight);
+            var result = _imageService.BinarizePercentBlack(PercentBlack);
+            ApplyProcessedImage(result, $"Binarization (Percent Black: {PercentBlack:F1}%)");
+        }
+        catch (Exception ex)
+        {
+            StatusMessage = $"Error: {ex.Message}";
+        }
+    }
+
+    [RelayCommand]
+    private void ApplyBinarizeMeanIterative()
+    {
+        if (!IsImageLoaded || ImageData == null) return;
+        
+        try
+        {
+            _imageService.LoadImage(ImageData, ImageWidth, ImageHeight);
+            var result = _imageService.BinarizeMeanIterative();
+            ApplyProcessedImage(result, "Binarization (Mean Iterative Selection)");
+        }
+        catch (Exception ex)
+        {
+            StatusMessage = $"Error: {ex.Message}";
+        }
+    }
+
+    [RelayCommand]
+    private void ApplyBinarizeEntropy()
+    {
+        if (!IsImageLoaded || ImageData == null) return;
+        
+        try
+        {
+            _imageService.LoadImage(ImageData, ImageWidth, ImageHeight);
+            var result = _imageService.BinarizeEntropy();
+            ApplyProcessedImage(result, "Binarization (Entropy Selection)");
+        }
+        catch (Exception ex)
+        {
+            StatusMessage = $"Error: {ex.Message}";
+        }
+    }
+
+    [RelayCommand]
+    private void ApplyBinarizeMinimumError()
+    {
+        if (!IsImageLoaded || ImageData == null) return;
+        
+        try
+        {
+            _imageService.LoadImage(ImageData, ImageWidth, ImageHeight);
+            var result = _imageService.BinarizeMinimumError();
+            ApplyProcessedImage(result, "Binarization (Minimum Error)");
+        }
+        catch (Exception ex)
+        {
+            StatusMessage = $"Error: {ex.Message}";
+        }
+    }
+
+    [RelayCommand]
+    private void ApplyBinarizeFuzzyMinimumError()
+    {
+        if (!IsImageLoaded || ImageData == null) return;
+        
+        try
+        {
+            _imageService.LoadImage(ImageData, ImageWidth, ImageHeight);
+            var result = _imageService.BinarizeFuzzyMinimumError();
+            ApplyProcessedImage(result, "Binarization (Fuzzy Minimum Error)");
+        }
+        catch (Exception ex)
+        {
+            StatusMessage = $"Error: {ex.Message}";
+        }
+    }
+}

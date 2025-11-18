@@ -424,14 +424,19 @@ public class ImageProcessingService
     }
 
     /// <summary>
-    /// Applies Gaussian blur filter.
+    /// Applies Gaussian blur filter with optimal kernel size based on sigma.
+    /// Optimization: Uses larger kernel for larger sigma values for better quality.
     /// </summary>
     public byte[] ApplyGaussianBlur(double sigma = 1.0)
     {
         if (_imageData == null) throw new InvalidOperationException("No image loaded");
         
-        // Generate Gaussian kernel (5x5)
-        int kernelSize = 5;
+        // Optimization: Calculate optimal kernel size based on sigma
+        // Rule of thumb: kernel size should be at least 6*sigma + 1 to capture 99.7% of the Gaussian
+        // We use ceiling to ensure odd size and limit to reasonable maximum
+        int kernelSize = Math.Min((int)Math.Ceiling(sigma * 6) | 1, 31); // Ensure odd, max 31x31
+        if (kernelSize < 3) kernelSize = 3; // Minimum 3x3
+        
         double[,] kernel = GenerateGaussianKernel(kernelSize, sigma);
         
         return ApplyConvolution(kernel);
@@ -531,6 +536,564 @@ public class ImageProcessingService
             throw new ArgumentException("New data must have the same length as current image data");
         
         _imageData = newData;
+    }
+
+    // ============================================
+    // HISTOGRAM OPERATIONS
+    // ============================================
+
+    /// <summary>
+    /// Calculates histogram for grayscale image or each RGB channel.
+    /// Returns array of 256 values for each intensity level.
+    /// </summary>
+    public int[] CalculateHistogram(byte[] imageData, int channel = -1)
+    {
+        int[] histogram = new int[256];
+        
+        if (channel == -1)
+        {
+            // All channels (average for grayscale)
+            for (int i = 0; i < imageData.Length; i += 3)
+            {
+                int gray = (imageData[i] + imageData[i + 1] + imageData[i + 2]) / 3;
+                histogram[gray]++;
+            }
+        }
+        else
+        {
+            // Specific channel (0=R, 1=G, 2=B)
+            for (int i = channel; i < imageData.Length; i += 3)
+            {
+                histogram[imageData[i]]++;
+            }
+        }
+        
+        return histogram;
+    }
+
+    /// <summary>
+    /// Applies histogram stretching (normalization) to expand the range of intensities.
+    /// </summary>
+    public byte[] HistogramStretching()
+    {
+        if (_imageData == null) throw new InvalidOperationException("No image loaded");
+        
+        byte[] result = new byte[_imageData.Length];
+        
+        // Find min and max values for each channel
+        byte minR = 255, maxR = 0;
+        byte minG = 255, maxG = 0;
+        byte minB = 255, maxB = 0;
+        
+        for (int i = 0; i < _imageData.Length; i += 3)
+        {
+            if (_imageData[i] < minR) minR = _imageData[i];
+            if (_imageData[i] > maxR) maxR = _imageData[i];
+            
+            if (_imageData[i + 1] < minG) minG = _imageData[i + 1];
+            if (_imageData[i + 1] > maxG) maxG = _imageData[i + 1];
+            
+            if (_imageData[i + 2] < minB) minB = _imageData[i + 2];
+            if (_imageData[i + 2] > maxB) maxB = _imageData[i + 2];
+        }
+        
+        // Stretch each channel independently
+        double rangeR = maxR - minR;
+        double rangeG = maxG - minG;
+        double rangeB = maxB - minB;
+        
+        for (int i = 0; i < _imageData.Length; i += 3)
+        {
+            if (rangeR > 0)
+                result[i] = (byte)((_imageData[i] - minR) * 255.0 / rangeR);
+            else
+                result[i] = _imageData[i];
+            
+            if (rangeG > 0)
+                result[i + 1] = (byte)((_imageData[i + 1] - minG) * 255.0 / rangeG);
+            else
+                result[i + 1] = _imageData[i + 1];
+            
+            if (rangeB > 0)
+                result[i + 2] = (byte)((_imageData[i + 2] - minB) * 255.0 / rangeB);
+            else
+                result[i + 2] = _imageData[i + 2];
+        }
+        
+        return result;
+    }
+
+    /// <summary>
+    /// Applies histogram equalization to improve contrast.
+    /// </summary>
+    public byte[] HistogramEqualization()
+    {
+        if (_imageData == null) throw new InvalidOperationException("No image loaded");
+        
+        byte[] result = new byte[_imageData.Length];
+        
+        // Process each channel separately
+        for (int channel = 0; channel < 3; channel++)
+        {
+            // Calculate histogram for this channel
+            int[] histogram = new int[256];
+            for (int i = channel; i < _imageData.Length; i += 3)
+            {
+                histogram[_imageData[i]]++;
+            }
+            
+            // Calculate cumulative distribution function (CDF)
+            int[] cdf = new int[256];
+            cdf[0] = histogram[0];
+            for (int i = 1; i < 256; i++)
+            {
+                cdf[i] = cdf[i - 1] + histogram[i];
+            }
+            
+            // Find minimum non-zero CDF value
+            int cdfMin = 0;
+            for (int i = 0; i < 256; i++)
+            {
+                if (cdf[i] > 0)
+                {
+                    cdfMin = cdf[i];
+                    break;
+                }
+            }
+            
+            // Calculate total number of pixels for this channel
+            int totalPixels = _width * _height;
+            
+            // Apply equalization using the formula: h(v) = round((cdf(v) - cdf_min) / (M*N - cdf_min) * 255)
+            byte[] lookupTable = new byte[256];
+            for (int i = 0; i < 256; i++)
+            {
+                if (totalPixels - cdfMin > 0)
+                    lookupTable[i] = (byte)Math.Round((cdf[i] - cdfMin) * 255.0 / (totalPixels - cdfMin));
+                else
+                    lookupTable[i] = (byte)i;
+            }
+            
+            // Apply lookup table
+            for (int i = channel; i < _imageData.Length; i += 3)
+            {
+                result[i] = lookupTable[_imageData[i]];
+            }
+        }
+        
+        return result;
+    }
+
+    // ============================================
+    // BINARIZATION METHODS
+    // ============================================
+
+    /// <summary>
+    /// Applies manual thresholding binarization.
+    /// Pixels above threshold become white (255), below become black (0).
+    /// </summary>
+    public byte[] BinarizeManual(int threshold)
+    {
+        if (_imageData == null) throw new InvalidOperationException("No image loaded");
+        
+        byte[] result = new byte[_imageData.Length];
+        
+        for (int i = 0; i < _imageData.Length; i += 3)
+        {
+            // Convert to grayscale first
+            int gray = (int)(0.299 * _imageData[i] + 0.587 * _imageData[i + 1] + 0.114 * _imageData[i + 2]);
+            
+            byte value = (byte)(gray >= threshold ? 255 : 0);
+            result[i] = result[i + 1] = result[i + 2] = value;
+        }
+        
+        return result;
+    }
+
+    /// <summary>
+    /// Applies Percent Black Selection thresholding.
+    /// Selects threshold so that a specified percentage of pixels become black.
+    /// </summary>
+    public byte[] BinarizePercentBlack(double percentBlack)
+    {
+        if (_imageData == null) throw new InvalidOperationException("No image loaded");
+        if (percentBlack < 0 || percentBlack > 100)
+            throw new ArgumentException("Percent black must be between 0 and 100");
+        
+        // Convert to grayscale and collect all intensity values
+        int[] grayValues = new int[_width * _height];
+        int idx = 0;
+        
+        for (int i = 0; i < _imageData.Length; i += 3)
+        {
+            grayValues[idx++] = (int)(0.299 * _imageData[i] + 0.587 * _imageData[i + 1] + 0.114 * _imageData[i + 2]);
+        }
+        
+        // Sort grayscale values
+        Array.Sort(grayValues);
+        
+        // Find threshold at the specified percentile
+        int thresholdIndex = (int)(grayValues.Length * percentBlack / 100.0);
+        thresholdIndex = Math.Clamp(thresholdIndex, 0, grayValues.Length - 1);
+        int threshold = grayValues[thresholdIndex];
+        
+        // Apply binarization
+        return BinarizeManual(threshold);
+    }
+
+    /// <summary>
+    /// Applies Mean Iterative Selection (also known as Isodata) thresholding.
+    /// Iteratively calculates the mean of pixels above and below threshold until convergence.
+    /// </summary>
+    public byte[] BinarizeMeanIterative()
+    {
+        if (_imageData == null) throw new InvalidOperationException("No image loaded");
+        
+        // Convert to grayscale
+        int[] grayValues = new int[_width * _height];
+        int idx = 0;
+        
+        for (int i = 0; i < _imageData.Length; i += 3)
+        {
+            grayValues[idx++] = (int)(0.299 * _imageData[i] + 0.587 * _imageData[i + 1] + 0.114 * _imageData[i + 2]);
+        }
+        
+        // Initial threshold is the mean of all pixels
+        int threshold = grayValues.Sum() / grayValues.Length;
+        int oldThreshold;
+        
+        const int maxIterations = 100;
+        int iteration = 0;
+        
+        do
+        {
+            oldThreshold = threshold;
+            
+            // Calculate mean of pixels below and above threshold
+            long sumBelow = 0, sumAbove = 0;
+            int countBelow = 0, countAbove = 0;
+            
+            foreach (int gray in grayValues)
+            {
+                if (gray <= threshold)
+                {
+                    sumBelow += gray;
+                    countBelow++;
+                }
+                else
+                {
+                    sumAbove += gray;
+                    countAbove++;
+                }
+            }
+            
+            int meanBelow = countBelow > 0 ? (int)(sumBelow / countBelow) : 0;
+            int meanAbove = countAbove > 0 ? (int)(sumAbove / countAbove) : 255;
+            
+            // New threshold is the average of the two means
+            threshold = (meanBelow + meanAbove) / 2;
+            
+            iteration++;
+        } while (threshold != oldThreshold && iteration < maxIterations);
+        
+        // Apply binarization
+        return BinarizeManual(threshold);
+    }
+
+    /// <summary>
+    /// Applies Entropy Selection (Kapur) thresholding.
+    /// Maximizes the sum of entropies of foreground and background.
+    /// </summary>
+    public byte[] BinarizeEntropy()
+    {
+        if (_imageData == null) throw new InvalidOperationException("No image loaded");
+        
+        // Calculate histogram
+        int[] histogram = new int[256];
+        for (int i = 0; i < _imageData.Length; i += 3)
+        {
+            int gray = (int)(0.299 * _imageData[i] + 0.587 * _imageData[i + 1] + 0.114 * _imageData[i + 2]);
+            histogram[gray]++;
+        }
+        
+        int totalPixels = _width * _height;
+        
+        // Calculate probability distribution
+        double[] probability = new double[256];
+        for (int i = 0; i < 256; i++)
+        {
+            probability[i] = (double)histogram[i] / totalPixels;
+        }
+        
+        // Find threshold that maximizes entropy
+        double maxEntropy = double.MinValue;
+        int bestThreshold = 0;
+        
+        for (int t = 0; t < 256; t++)
+        {
+            // Calculate probability of background (0 to t)
+            double probBackground = 0;
+            for (int i = 0; i <= t; i++)
+            {
+                probBackground += probability[i];
+            }
+            
+            // Calculate probability of foreground (t+1 to 255)
+            double probForeground = 1.0 - probBackground;
+            
+            if (probBackground == 0 || probForeground == 0)
+                continue;
+            
+            // Calculate entropy of background
+            double entropyBackground = 0;
+            for (int i = 0; i <= t; i++)
+            {
+                if (probability[i] > 0)
+                {
+                    double p = probability[i] / probBackground;
+                    entropyBackground -= p * Math.Log(p);
+                }
+            }
+            
+            // Calculate entropy of foreground
+            double entropyForeground = 0;
+            for (int i = t + 1; i < 256; i++)
+            {
+                if (probability[i] > 0)
+                {
+                    double p = probability[i] / probForeground;
+                    entropyForeground -= p * Math.Log(p);
+                }
+            }
+            
+            // Total entropy
+            double totalEntropy = entropyBackground + entropyForeground;
+            
+            if (totalEntropy > maxEntropy)
+            {
+                maxEntropy = totalEntropy;
+                bestThreshold = t;
+            }
+        }
+        
+        // Apply binarization
+        return BinarizeManual(bestThreshold);
+    }
+
+    /// <summary>
+    /// Applies Minimum Error (Kittler-Illingworth) thresholding.
+    /// Assumes Gaussian distribution for foreground and background, minimizes classification error.
+    /// </summary>
+    public byte[] BinarizeMinimumError()
+    {
+        if (_imageData == null) throw new InvalidOperationException("No image loaded");
+        
+        // Calculate histogram
+        int[] histogram = new int[256];
+        for (int i = 0; i < _imageData.Length; i += 3)
+        {
+            int gray = (int)(0.299 * _imageData[i] + 0.587 * _imageData[i + 1] + 0.114 * _imageData[i + 2]);
+            histogram[gray]++;
+        }
+        
+        int totalPixels = _width * _height;
+        
+        double minError = double.MaxValue;
+        int bestThreshold = 0;
+        
+        for (int t = 1; t < 255; t++)
+        {
+            // Calculate statistics for background (0 to t)
+            double P1 = 0, mean1 = 0;
+            for (int i = 0; i <= t; i++)
+            {
+                P1 += histogram[i];
+                mean1 += i * histogram[i];
+            }
+            
+            if (P1 == 0) continue;
+            mean1 /= P1;
+            P1 /= totalPixels;
+            
+            double variance1 = 0;
+            for (int i = 0; i <= t; i++)
+            {
+                double diff = i - mean1;
+                variance1 += histogram[i] * diff * diff;
+            }
+            variance1 /= (P1 * totalPixels);
+            
+            // Calculate statistics for foreground (t+1 to 255)
+            double P2 = 0, mean2 = 0;
+            for (int i = t + 1; i < 256; i++)
+            {
+                P2 += histogram[i];
+                mean2 += i * histogram[i];
+            }
+            
+            if (P2 == 0) continue;
+            mean2 /= P2;
+            P2 /= totalPixels;
+            
+            double variance2 = 0;
+            for (int i = t + 1; i < 256; i++)
+            {
+                double diff = i - mean2;
+                variance2 += histogram[i] * diff * diff;
+            }
+            variance2 /= (P2 * totalPixels);
+            
+            // Avoid log of zero or negative values
+            if (variance1 <= 0 || variance2 <= 0 || P1 <= 0 || P2 <= 0)
+                continue;
+            
+            // Calculate criterion (Kittler-Illingworth)
+            double J = 1.0 + 2.0 * (P1 * Math.Log(variance1) + P2 * Math.Log(variance2)) 
+                       - 2.0 * (P1 * Math.Log(P1) + P2 * Math.Log(P2));
+            
+            if (J < minError)
+            {
+                minError = J;
+                bestThreshold = t;
+            }
+        }
+        
+        // Apply binarization
+        return BinarizeManual(bestThreshold);
+    }
+
+    /// <summary>
+    /// Applies Fuzzy Minimum Error thresholding.
+    /// Extension of minimum error method using fuzzy set theory.
+    /// </summary>
+    public byte[] BinarizeFuzzyMinimumError()
+    {
+        if (_imageData == null) throw new InvalidOperationException("No image loaded");
+        
+        // Calculate histogram
+        int[] histogram = new int[256];
+        for (int i = 0; i < _imageData.Length; i += 3)
+        {
+            int gray = (int)(0.299 * _imageData[i] + 0.587 * _imageData[i + 1] + 0.114 * _imageData[i + 2]);
+            histogram[gray]++;
+        }
+        
+        int totalPixels = _width * _height;
+        
+        double minError = double.MaxValue;
+        int bestThreshold = 0;
+        
+        for (int t = 1; t < 255; t++)
+        {
+            // Calculate fuzzy membership for background and foreground
+            double P1 = 0, P2 = 0;
+            double mean1 = 0, mean2 = 0;
+            
+            // Fuzzy membership using S-function for background and Z-function for foreground
+            for (int i = 0; i < 256; i++)
+            {
+                double membershipBg, membershipFg;
+                
+                if (i <= t)
+                {
+                    membershipBg = 1.0;
+                    membershipFg = 0.0;
+                }
+                else
+                {
+                    membershipBg = 0.0;
+                    membershipFg = 1.0;
+                }
+                
+                // Fuzzy gradual transition near threshold
+                int transitionWidth = 10;
+                if (Math.Abs(i - t) <= transitionWidth)
+                {
+                    double dist = Math.Abs(i - t) / (double)transitionWidth;
+                    if (i < t)
+                    {
+                        membershipBg = 1.0;
+                        membershipFg = dist;
+                    }
+                    else
+                    {
+                        membershipBg = 1.0 - dist;
+                        membershipFg = 1.0;
+                    }
+                }
+                
+                double weightedCount = histogram[i];
+                P1 += membershipBg * weightedCount;
+                P2 += membershipFg * weightedCount;
+                mean1 += membershipBg * i * weightedCount;
+                mean2 += membershipFg * i * weightedCount;
+            }
+            
+            if (P1 == 0 || P2 == 0) continue;
+            
+            mean1 /= P1;
+            mean2 /= P2;
+            
+            // Calculate fuzzy variances
+            double variance1 = 0, variance2 = 0;
+            for (int i = 0; i < 256; i++)
+            {
+                double membershipBg, membershipFg;
+                
+                if (i <= t)
+                {
+                    membershipBg = 1.0;
+                    membershipFg = 0.0;
+                }
+                else
+                {
+                    membershipBg = 0.0;
+                    membershipFg = 1.0;
+                }
+                
+                int transitionWidth = 10;
+                if (Math.Abs(i - t) <= transitionWidth)
+                {
+                    double dist = Math.Abs(i - t) / (double)transitionWidth;
+                    if (i < t)
+                    {
+                        membershipBg = 1.0;
+                        membershipFg = dist;
+                    }
+                    else
+                    {
+                        membershipBg = 1.0 - dist;
+                        membershipFg = 1.0;
+                    }
+                }
+                
+                variance1 += membershipBg * histogram[i] * Math.Pow(i - mean1, 2);
+                variance2 += membershipFg * histogram[i] * Math.Pow(i - mean2, 2);
+            }
+            
+            variance1 /= P1;
+            variance2 /= P2;
+            
+            if (variance1 <= 0 || variance2 <= 0) continue;
+            
+            P1 /= totalPixels;
+            P2 /= totalPixels;
+            
+            if (P1 <= 0 || P2 <= 0) continue;
+            
+            // Calculate fuzzy minimum error criterion
+            double J = 1.0 + 2.0 * (P1 * Math.Log(variance1) + P2 * Math.Log(variance2))
+                       - 2.0 * (P1 * Math.Log(P1) + P2 * Math.Log(P2));
+            
+            if (J < minError)
+            {
+                minError = J;
+                bestThreshold = t;
+            }
+        }
+        
+        // Apply binarization
+        return BinarizeManual(bestThreshold);
     }
 }
 

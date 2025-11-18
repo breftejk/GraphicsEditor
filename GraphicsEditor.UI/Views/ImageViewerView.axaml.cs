@@ -89,7 +89,95 @@ public partial class ImageViewerView : UserControl
                     System.Diagnostics.Debug.WriteLine($"ImageData changed, rendering: {ViewModel.ImageWidth}x{ViewModel.ImageHeight}");
                     RenderImage(ViewModel.ImageData, ViewModel.ImageWidth, ViewModel.ImageHeight);
                 }
+                else if (args.PropertyName == nameof(ViewModel.HistogramData))
+                {
+                    // Update histogram visualization
+                    System.Diagnostics.Debug.WriteLine("HistogramData changed, drawing histogram");
+                    DrawHistogram();
+                }
             };
+        }
+    }
+
+    private void DrawHistogram()
+    {
+        var canvas = this.FindControl<Canvas>("HistogramCanvas");
+        if (canvas == null || ViewModel?.HistogramData == null)
+        {
+            System.Diagnostics.Debug.WriteLine("DrawHistogram: canvas or data is null");
+            return;
+        }
+
+        Dispatcher.UIThread.Post(() =>
+        {
+            try
+            {
+                canvas.Children.Clear();
+
+                int[] histogram = ViewModel.HistogramData;
+                double canvasWidth = canvas.Bounds.Width;
+                double canvasHeight = canvas.Bounds.Height;
+
+                System.Diagnostics.Debug.WriteLine($"Drawing histogram: canvas size {canvasWidth}x{canvasHeight}");
+
+                if (canvasWidth <= 0 || canvasHeight <= 0)
+                {
+                    // Canvas not yet measured, try again after layout
+                    System.Diagnostics.Debug.WriteLine("Canvas not measured yet, scheduling redraw");
+                    canvas.LayoutUpdated += OnHistogramCanvasLayoutUpdated;
+                    return;
+                }
+
+                // Find max value for scaling
+                int maxValue = histogram.Max();
+                if (maxValue == 0)
+                {
+                    System.Diagnostics.Debug.WriteLine("Histogram max value is 0");
+                    return;
+                }
+
+                System.Diagnostics.Debug.WriteLine($"Histogram max value: {maxValue}");
+
+                // Draw bars
+                double barWidth = canvasWidth / 256.0;
+                
+                for (int i = 0; i < 256; i++)
+                {
+                    double barHeight = (histogram[i] / (double)maxValue) * (canvasHeight - 2);
+                    
+                    if (barHeight > 0)
+                    {
+                        var rect = new Avalonia.Controls.Shapes.Rectangle
+                        {
+                            Width = Math.Max(1, barWidth),
+                            Height = barHeight,
+                            Fill = new SolidColorBrush(Color.FromRgb((byte)i, (byte)i, (byte)i))
+                        };
+
+                        Canvas.SetLeft(rect, i * barWidth);
+                        Canvas.SetTop(rect, canvasHeight - barHeight);
+
+                        canvas.Children.Add(rect);
+                    }
+                }
+
+                System.Diagnostics.Debug.WriteLine($"Histogram drawn: {canvas.Children.Count} bars");
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Error drawing histogram: {ex.Message}");
+            }
+        });
+    }
+
+    private void OnHistogramCanvasLayoutUpdated(object? sender, EventArgs e)
+    {
+        var canvas = sender as Canvas;
+        if (canvas != null)
+        {
+            canvas.LayoutUpdated -= OnHistogramCanvasLayoutUpdated;
+            System.Diagnostics.Debug.WriteLine("Canvas layout updated, redrawing histogram");
+            DrawHistogram();
         }
     }
 
@@ -249,6 +337,13 @@ public partial class ImageViewerView : UserControl
             // After ViewModel loads the data, render it
             if (ViewModel.ImageData != null && ViewModel.ImageWidth > 0 && ViewModel.ImageHeight > 0)
             {
+                // Reset zoom to 1.0 when loading a NEW image
+                if (ViewModel != null)
+                {
+                    ViewModel.ZoomLevel = 1.0;
+                    _currentZoom = 1.0;
+                }
+                
                 RenderImage(ViewModel.ImageData, ViewModel.ImageWidth, ViewModel.ImageHeight);
             }
         }
@@ -352,40 +447,9 @@ public partial class ImageViewerView : UserControl
             
             System.Diagnostics.Debug.WriteLine($"Image added to canvas. Canvas children count: {canvas.Children.Count}");
             
-            // Auto-scale small images by calling ViewModel's ResetZoom first, then setting appropriate zoom
-            if (ViewModel != null)
-            {
-                // Reset to sync service
-                ViewModel.ResetZoomCommand.Execute(null);
-                
-                if (width < 100 || height < 100)
-                {
-                    double scaleX = 100.0 / width;
-                    double scaleY = 100.0 / height;
-                    double autoZoom = Math.Min(scaleX, scaleY);
-                    
-                    // Use service to set zoom properly
-                    int zoomInSteps = (int)Math.Log(autoZoom, 1.2);
-                    for (int i = 0; i < zoomInSteps; i++)
-                    {
-                        ViewModel.ZoomInCommand.Execute(null);
-                    }
-                    
-                    System.Diagnostics.Debug.WriteLine($"Auto-zoom applied: {ViewModel.ZoomLevel}x (target was {autoZoom}x)");
-                    
-                    // Update zoom transform manually since we're inside _isRendering block
-                    var zoomCanvas = this.FindControl<Canvas>("ImageCanvas");
-                    if (zoomCanvas?.RenderTransform is ScaleTransform zoomTransform)
-                    {
-                        zoomTransform.ScaleX = ViewModel.ZoomLevel;
-                        zoomTransform.ScaleY = ViewModel.ZoomLevel;
-                        _currentZoom = ViewModel.ZoomLevel;
-                    }
-                    
-                    // Update RGB overlay after auto-zoom (we're still in _isRendering, but overlay needs current zoom)
-                    UpdateRgbOverlay(canvas);
-                }
-            }
+            // PRESERVE current zoom level - don't reset!
+            // The zoom is already set in _currentZoom and ApplyZoom will handle it
+            System.Diagnostics.Debug.WriteLine($"Preserving zoom level: {_currentZoom}x");
         }
         }
         finally
@@ -440,25 +504,62 @@ public partial class ImageViewerView : UserControl
 
     private void ImageCanvas_OnPointerReleased(object? sender, PointerReleasedEventArgs e)
     {
+        var canvas = sender as Canvas;
+        if (canvas == null) return;
+
+        var scrollViewer = this.FindControl<ScrollViewer>("ImageScrollViewer");
+        if (scrollViewer == null) return;
+
+        // Check if this was a click (not much panning)
+        var currentPoint = e.GetPosition(scrollViewer);
+        double distance = Math.Sqrt(Math.Pow(currentPoint.X - _panStartPoint.X, 2) + Math.Pow(currentPoint.Y - _panStartPoint.Y, 2));
+        bool wasClick = !_isPanning || (_isPanning && distance < 5);
+        
         if (_isPanning)
         {
             _isPanning = false;
-            
-            // Release pointer capture
-            var canvas = sender as Canvas;
             e.Pointer.Capture(null);
-            
             System.Diagnostics.Debug.WriteLine("Pan ended");
         }
         
-        // Also handle pixel inspection on click (only if we didn't pan much)
-        if (ViewModel != null)
+        // Handle pixel inspection on click
+        if (wasClick && ViewModel != null && _currentPixelData != null && _currentWidth > 0 && _currentHeight > 0)
         {
-            var canvas = sender as Canvas;
-            if (canvas != null)
+            // Get position relative to scrollviewer (viewport coordinates)
+            var viewportPos = e.GetPosition(scrollViewer);
+            
+            // Convert viewport position to image coordinates
+            // Account for scroll offset and zoom
+            double imageX = (scrollViewer.Offset.X + viewportPos.X) / _currentZoom;
+            double imageY = (scrollViewer.Offset.Y + viewportPos.Y) / _currentZoom;
+            
+            int pixelX = (int)Math.Floor(imageX);
+            int pixelY = (int)Math.Floor(imageY);
+            
+            System.Diagnostics.Debug.WriteLine($"Click: viewport=({viewportPos.X:F1},{viewportPos.Y:F1}), scroll=({scrollViewer.Offset.X:F1},{scrollViewer.Offset.Y:F1}), zoom={_currentZoom:F2}, pixel=({pixelX},{pixelY})");
+            
+            // Validate coordinates
+            if (pixelX >= 0 && pixelX < _currentWidth && pixelY >= 0 && pixelY < _currentHeight)
             {
-                var pos = e.GetPosition(canvas);
-                ViewModel.PixelInfo = $"Position: X={pos.X:F0}, Y={pos.Y:F0}";
+                // Get pixel color
+                int pixelIndex = (pixelY * _currentWidth + pixelX) * 3;
+                if (pixelIndex + 2 < _currentPixelData.Length)
+                {
+                    byte r = _currentPixelData[pixelIndex];
+                    byte g = _currentPixelData[pixelIndex + 1];
+                    byte b = _currentPixelData[pixelIndex + 2];
+                    
+                    // Update ViewModel
+                    var color = new GraphicsEditor.Core.Models.RgbColor(r, g, b);
+                    ViewModel.SelectedPixelColor = color;
+                    ViewModel.PixelInfo = $"Pixel ({pixelX}, {pixelY}): R={r}, G={g}, B={b}";
+                    
+                    System.Diagnostics.Debug.WriteLine($"Pixel clicked: ({pixelX}, {pixelY}) = RGB({r}, {g}, {b})");
+                }
+            }
+            else
+            {
+                System.Diagnostics.Debug.WriteLine($"Pixel coordinates out of bounds: ({pixelX}, {pixelY}), image size: {_currentWidth}x{_currentHeight}");
             }
         }
     }

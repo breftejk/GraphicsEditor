@@ -19,6 +19,7 @@
             <WrapPanel>
                 <Button Name="LoadImageButton" Content="Load Image" Margin="5" Padding="10,5" Click="LoadImageButton_Click"/>
                 <Button Name="SaveImageButton" Content="Save as JPEG" Margin="5" Padding="10,5" Click="SaveImageButton_Click" IsEnabled="{Binding IsImageLoaded}"/>
+                <Button Name="SaveImageAsPngButton" Content="Save as PNG" Margin="5" Padding="10,5" Click="SaveImageAsPngButton_Click" IsEnabled="{Binding IsImageLoaded}"/>
                 <Separator Width="20"/>
                 <Button Content="Zoom In" Margin="5" Command="{Binding ZoomInCommand}" IsEnabled="{Binding IsImageLoaded}"/>
                 <Button Content="Zoom Out" Margin="5" Command="{Binding ZoomOutCommand}" IsEnabled="{Binding IsImageLoaded}"/>

@@ -59,6 +59,7 @@ public static class FileErrorHandler
             ".ppm" => true,
             ".jpg" => true,
             ".jpeg" => true,
+            ".png" => true,
             _ => false
         };
     }
@@ -73,6 +74,7 @@ public static class FileErrorHandler
         {
             ".ppm" => ImageFormat.Ppm,
             ".jpg" or ".jpeg" => ImageFormat.Jpeg,
+            ".png" => ImageFormat.Png,
             _ => throw new NotSupportedException($"Unsupported image format: {extension}")
         };
     }
@@ -81,5 +83,6 @@ public static class FileErrorHandler
 public enum ImageFormat
 {
     Ppm,
-    Jpeg
+    Jpeg,
+    Png
 }

@@ -289,6 +289,11 @@ public partial class ImageViewerView : UserControl
         await SaveImageAsJpegAsync();
     }
 
+    private async void SaveImageAsPngButton_Click(object? sender, RoutedEventArgs e)
+    {
+        await SaveImageAsPngAsync();
+    }
+
     private async Task SaveImageAsJpegAsync()
     {
         if (ViewModel?.ImageData == null)
@@ -333,6 +338,50 @@ public partial class ImageViewerView : UserControl
         }
     }
 
+    private async Task SaveImageAsPngAsync()
+    {
+        if (ViewModel?.ImageData == null)
+        {
+            if (ViewModel != null)
+            {
+                ViewModel.StatusMessage = "No image to save";
+            }
+            return;
+        }
+
+        var topLevel = TopLevel.GetTopLevel(this);
+        if (topLevel == null) return;
+
+        var file = await topLevel.StorageProvider.SaveFilePickerAsync(new FilePickerSaveOptions
+        {
+            Title = "Save PNG Image",
+            DefaultExtension = "png",
+            SuggestedFileName = "output.png",
+            FileTypeChoices = new[]
+            {
+                new FilePickerFileType("PNG Image")
+                {
+                    Patterns = new[] { "*.png" }
+                }
+            }
+        });
+
+        if (file != null)
+        {
+            try
+            {
+                var filePath = file.Path.LocalPath;
+                var pngWriter = new IO.PngWriter();
+                pngWriter.WriteRgb(filePath, ViewModel.ImageData, ViewModel.ImageWidth, ViewModel.ImageHeight);
+                ViewModel.StatusMessage = $"✅ Saved PNG to: {System.IO.Path.GetFileName(filePath)}";
+            }
+            catch (Exception ex)
+            {
+                ViewModel.StatusMessage = $"❌ Error saving PNG: {ex.Message}";
+            }
+        }
+    }
+
     private async Task LoadImageAsync()
     {
         var topLevel = TopLevel.GetTopLevel(this);
@@ -346,7 +395,7 @@ public partial class ImageViewerView : UserControl
             {
                 new FilePickerFileType("Image Files")
                 {
-                    Patterns = new[] { "*.ppm", "*.jpg", "*.jpeg" }
+                    Patterns = new[] { "*.ppm", "*.jpg", "*.jpeg", "*.png" }
                 },
                 new FilePickerFileType("All Files")
                 {

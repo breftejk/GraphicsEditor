@@ -21,6 +21,8 @@ public partial class ImageViewerViewModel : ViewModelBase
     private readonly PpmWriter _ppmWriter;
     private readonly JpegReader _jpegReader;
     private readonly JpegWriter _jpegWriter;
+    private readonly PngReader _pngReader;
+    private readonly PngWriter _pngWriter;
 
     [ObservableProperty]
     private byte[]? _imageData;
@@ -148,6 +150,8 @@ public partial class ImageViewerViewModel : ViewModelBase
         _ppmWriter = new PpmWriter();
         _jpegReader = new JpegReader();
         _jpegWriter = new JpegWriter();
+        _pngReader = new PngReader();
+        _pngWriter = new PngWriter();
     }
 
     partial void OnJpegQualityChanged(int value)
@@ -216,6 +220,15 @@ public partial class ImageViewerViewModel : ViewModelBase
                 ImageHeight = jpegImage.Height;
                 StatusMessage = $"Loaded JPEG: {ImageWidth}x{ImageHeight}";
             }
+            else if (format == ImageFormat.Png)
+            {
+                var pngImage = _pngReader.ReadAsRgb(filePath);
+                ImageData = pngImage.PixelData;
+                _originalImageData = (byte[])pngImage.PixelData.Clone(); // Store original
+                ImageWidth = pngImage.Width;
+                ImageHeight = pngImage.Height;
+                StatusMessage = $"Loaded PNG: {ImageWidth}x{ImageHeight}";
+            }
 
             _imageService.LoadImage(ImageData!, ImageWidth, ImageHeight);
             LoadedFilePath = filePath;
@@ -251,6 +264,11 @@ public partial class ImageViewerViewModel : ViewModelBase
                 {
                     var jpegImage = _jpegReader.Read(filePath);
                     return (jpegImage.PixelData, jpegImage.Width, jpegImage.Height, $"Loaded JPEG: {jpegImage.Width}x{jpegImage.Height}");
+                }
+                else if (format == ImageFormat.Png)
+                {
+                    var pngImage = _pngReader.ReadAsRgb(filePath);
+                    return (pngImage.PixelData, pngImage.Width, pngImage.Height, $"Loaded PNG: {pngImage.Width}x{pngImage.Height}");
                 }
                 
                 throw new InvalidOperationException("Unsupported image format");
@@ -304,6 +322,30 @@ public partial class ImageViewerViewModel : ViewModelBase
             FileErrorHandler.ValidateFileWritable(filePath);
             _jpegWriter.Write(filePath, dataToSave, ImageWidth, ImageHeight, JpegQuality);
             StatusMessage = $"Saved JPEG with quality {JpegQuality}% to {filePath}";
+        }
+        catch (Exception ex)
+        {
+            StatusMessage = FileErrorHandler.GetUserFriendlyMessage(ex);
+        }
+    }
+
+    [RelayCommand]
+    private void SaveImageAsPng(string filePath)
+    {
+        // Save the current (possibly processed) image data
+        var dataToSave = ImageData;
+        
+        if (dataToSave == null)
+        {
+            StatusMessage = "No image to save";
+            return;
+        }
+
+        try
+        {
+            FileErrorHandler.ValidateFileWritable(filePath);
+            _pngWriter.WriteRgb(filePath, dataToSave, ImageWidth, ImageHeight);
+            StatusMessage = $"Saved PNG to {filePath}";
         }
         catch (Exception ex)
         {

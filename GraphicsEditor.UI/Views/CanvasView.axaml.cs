@@ -22,6 +22,8 @@ public partial class CanvasView : UserControl
     private Avalonia.Point _lastDragPoint;
     private IShape? _selectedShape;
     private const double HandleSize = 8.0;
+    private const double VertexHandleRadius = 4.0;
+    private const double VertexSelectionTolerance = 6.0;
 
     private BezierCurve? _activeBezier; // currently constructed curve when tool=Bezier
     private int _activeBezierControlPointIndex = -1; // index of CP being dragged
@@ -139,7 +141,7 @@ public partial class CanvasView : UserControl
                     for (int i = 0; i < vertices.Count; i++)
                     {
                         var v = vertices[i];
-                        if (Math.Abs(v.X - _startPoint.X) <= 6 && Math.Abs(v.Y - _startPoint.Y) <= 6)
+                        if (Math.Abs(v.X - _startPoint.X) <= VertexSelectionTolerance && Math.Abs(v.Y - _startPoint.Y) <= VertexSelectionTolerance)
                         {
                             ViewModel.SelectedShape = polygon;
                             _selectedShape = polygon;
@@ -564,20 +566,19 @@ public partial class CanvasView : UserControl
                         _drawingCanvas.Children.Insert(_drawingCanvas.Children.Count - 1, highlightPath);
 
                         // Draw vertex handles
-                        const double r = 4;
                         for (int i = 0; i < vertices.Count; i++)
                         {
                             var v = vertices[i];
                             var dot = new Ellipse
                             {
-                                Width = r * 2,
-                                Height = r * 2,
+                                Width = VertexHandleRadius * 2,
+                                Height = VertexHandleRadius * 2,
                                 Fill = Brushes.White,
                                 Stroke = Brushes.Blue,
                                 StrokeThickness = 2
                             };
-                            Canvas.SetLeft(dot, v.X - r);
-                            Canvas.SetTop(dot, v.Y - r);
+                            Canvas.SetLeft(dot, v.X - VertexHandleRadius);
+                            Canvas.SetTop(dot, v.Y - VertexHandleRadius);
                             _drawingCanvas.Children.Add(dot);
                         }
                     }

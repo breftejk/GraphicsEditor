@@ -85,9 +85,12 @@ public class Polygon : IShape
 
     /// <summary>
     /// Applies a transformation to the polygon.
+    /// The new transform is applied before the existing transform (pre-multiplication),
+    /// so the transformation order follows standard matrix composition rules.
     /// </summary>
     public void ApplyTransform(Matrix3x3 transform)
     {
+        // Pre-multiply: new transform is applied before existing transform
         Transform = transform * Transform;
     }
 

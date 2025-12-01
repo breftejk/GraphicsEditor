@@ -183,14 +183,18 @@ public class ShapeService
         {
             // For rectangles, rotate the four corners and create new bounds
             var rotation = Matrix3x3.CreateRotationAround(pivot, angleRadians);
-            var corners = new[]
+            var corners = new Point2D[4]
             {
                 new Point2D(rect.X, rect.Y),
                 new Point2D(rect.X + rect.Width, rect.Y),
                 new Point2D(rect.X, rect.Y + rect.Height),
                 new Point2D(rect.X + rect.Width, rect.Y + rect.Height)
             };
-            var rotated = corners.Select(c => rotation.Transform(c)).ToArray();
+            var rotated = new Point2D[corners.Length];
+            for (int i = 0; i < corners.Length; i++)
+            {
+                rotated[i] = rotation.Transform(corners[i]);
+            }
             double minX = rotated.Min(p => p.X);
             double minY = rotated.Min(p => p.Y);
             double maxX = rotated.Max(p => p.X);

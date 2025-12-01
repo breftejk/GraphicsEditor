@@ -44,6 +44,8 @@
                                          IsChecked="{Binding SelectedTool, Converter={StaticResource EnumToBoolConverter}, ConverterParameter=Circle}"/>
                             <RadioButton Content="Bezier" 
                                          IsChecked="{Binding SelectedTool, Converter={StaticResource EnumToBoolConverter}, ConverterParameter=Bezier}"/>
+                            <RadioButton Content="Polygon" 
+                                         IsChecked="{Binding SelectedTool, Converter={StaticResource EnumToBoolConverter}, ConverterParameter=Polygon}"/>
                         </StackPanel>
                     </DockPanel>
                 </Border>
@@ -213,6 +215,70 @@
                         <TextBlock Text="Tip: With Bezier tool active, click to add exactly n+1 control points, then click Finish." FontSize="11" Foreground="Gray"/>
                     </StackPanel>
                 </Expander>
+
+                <!-- Polygon Parameters -->
+                <Expander Header="Polygon Parameters" IsVisible="{Binding IsPolygonSelected}">
+                    <StackPanel Spacing="5">
+                        <TextBlock Text="Vertices (x,y; ...):" FontWeight="SemiBold"/>
+                        <TextBox Text="{Binding PolygonVerticesText}" AcceptsReturn="True" Height="60" TextWrapping="Wrap"/>
+                        <Button Content="Add Polygon from Params" Command="{Binding AddPolygonFromParamsCommand}" HorizontalAlignment="Stretch"/>
+                        <Button Content="Update Selected Polygon" Command="{Binding UpdateSelectedShapeCommand}" HorizontalAlignment="Stretch"/>
+                        <Button Content="Finish Polygon (end adding vertices)" Command="{Binding FinishPolygonCommand}" HorizontalAlignment="Stretch"/>
+                        <TextBlock Text="Tip: With Polygon tool active, click to add vertices, then click Finish." FontSize="11" Foreground="Gray"/>
+                    </StackPanel>
+                </Expander>
+
+                <!-- Transformations -->
+                <Border BorderBrush="Gray" BorderThickness="1" CornerRadius="4">
+                    <DockPanel>
+                        <TextBlock DockPanel.Dock="Top" Text="Transformations" FontWeight="Bold" Margin="8,4" Background="#F0F0F0"/>
+                        <StackPanel Spacing="8" Margin="8">
+                            <!-- Translation -->
+                            <TextBlock Text="Translation:" FontWeight="SemiBold"/>
+                            <Grid ColumnDefinitions="Auto,*,Auto,*" RowDefinitions="Auto" ColumnSpacing="5">
+                                <TextBlock Grid.Column="0" Text="X:" VerticalAlignment="Center"/>
+                                <TextBox Grid.Column="1" Text="{Binding TranslateX}"/>
+                                <TextBlock Grid.Column="2" Text="Y:" VerticalAlignment="Center"/>
+                                <TextBox Grid.Column="3" Text="{Binding TranslateY}"/>
+                            </Grid>
+                            <Button Content="Apply Translation" Command="{Binding ApplyTranslationCommand}" HorizontalAlignment="Stretch"/>
+                            
+                            <Separator/>
+                            
+                            <!-- Pivot Point -->
+                            <TextBlock Text="Pivot Point (for Rotation/Scale):" FontWeight="SemiBold"/>
+                            <Grid ColumnDefinitions="Auto,*,Auto,*" RowDefinitions="Auto" ColumnSpacing="5">
+                                <TextBlock Grid.Column="0" Text="X:" VerticalAlignment="Center"/>
+                                <TextBox Grid.Column="1" Text="{Binding PivotX}"/>
+                                <TextBlock Grid.Column="2" Text="Y:" VerticalAlignment="Center"/>
+                                <TextBox Grid.Column="3" Text="{Binding PivotY}"/>
+                            </Grid>
+                            <Button Content="Set Pivot to Center" Command="{Binding SetPivotToCenterCommand}" HorizontalAlignment="Stretch"/>
+                            
+                            <Separator/>
+                            
+                            <!-- Rotation -->
+                            <TextBlock Text="Rotation:" FontWeight="SemiBold"/>
+                            <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto" ColumnSpacing="5">
+                                <TextBlock Grid.Column="0" Text="Angle (°):" VerticalAlignment="Center"/>
+                                <TextBox Grid.Column="1" Text="{Binding RotationAngle}"/>
+                            </Grid>
+                            <Button Content="Apply Rotation" Command="{Binding ApplyRotationCommand}" HorizontalAlignment="Stretch"/>
+                            
+                            <Separator/>
+                            
+                            <!-- Scale -->
+                            <TextBlock Text="Scale:" FontWeight="SemiBold"/>
+                            <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto" ColumnSpacing="5">
+                                <TextBlock Grid.Column="0" Text="Factor:" VerticalAlignment="Center"/>
+                                <TextBox Grid.Column="1" Text="{Binding ScaleFactor}"/>
+                            </Grid>
+                            <Button Content="Apply Scale" Command="{Binding ApplyScaleCommand}" HorizontalAlignment="Stretch"/>
+                            
+                            <TextBlock Text="Note: All transformations use homogeneous coordinates." FontSize="11" Foreground="Gray" TextWrapping="Wrap"/>
+                        </StackPanel>
+                    </DockPanel>
+                </Border>
 
                 <!-- Actions -->
                 <Border BorderBrush="Gray" BorderThickness="1" CornerRadius="4">

@@ -25,6 +25,8 @@ public partial class CanvasView : UserControl
 
     private BezierCurve? _activeBezier; // currently constructed curve when tool=Bezier
     private int _activeBezierControlPointIndex = -1; // index of CP being dragged
+    private Core.Models.Polygon? _activePolygon; // currently constructed polygon when tool=Polygon
+    private int _activePolygonVertexIndex = -1; // index of vertex being dragged
 
     public CanvasView()
     {
@@ -50,6 +52,12 @@ public partial class CanvasView : UserControl
                 {
                     _activeBezier = null;
                 }
+
+                // Reset active Polygon construction when changing tool away from Polygon
+                if (e.PropertyName == nameof(ViewModel.SelectedTool) && ViewModel.SelectedTool != DrawingTool.Polygon)
+                {
+                    _activePolygon = null;
+                }
                 
                 // Sync selected shape when ViewModel's SelectedShape changes
                 if (e.PropertyName == nameof(ViewModel.SelectedShape))
@@ -72,6 +80,10 @@ public partial class CanvasView : UserControl
                     RenderShapes();
                 }
             };
+
+            // Subscribe to FinishPolygonRequested event
+            ViewModel.FinishPolygonRequested += () => { _activePolygon = null; };
+
             _drawingCanvas = this.FindControl<Canvas>("DrawingCanvas");
             RenderShapes();
         }
@@ -97,6 +109,50 @@ public partial class CanvasView : UserControl
             _activeBezier.ControlPoints.Add(new Point2D(_startPoint.X, _startPoint.Y));
             RenderShapes();
             return;
+        }
+
+        // If Polygon tool is active: add a vertex on click (start new polygon if needed)
+        if (ViewModel.SelectedTool == DrawingTool.Polygon)
+        {
+            if (_activePolygon == null)
+            {
+                _activePolygon = new Core.Models.Polygon();
+                _activePolygon.StrokeColor = ViewModel.CurrentStrokeColor;
+                _activePolygon.FillColor = ViewModel.CurrentFillColor;
+                _activePolygon.StrokeThickness = ViewModel.CurrentStrokeThickness;
+                ViewModel.ShapeService.AddShape(_activePolygon);
+                ViewModel.SelectedShape = _activePolygon;
+            }
+            _activePolygon.AddVertex(_startPoint.X, _startPoint.Y);
+            RenderShapes();
+            return;
+        }
+
+        // If Select tool: prefer grabbing a Polygon vertex if near cursor
+        if (ViewModel.SelectedTool == DrawingTool.Select)
+        {
+            for (int si = ViewModel.ShapeService.Shapes.Count - 1; si >= 0; si--)
+            {
+                if (ViewModel.ShapeService.Shapes[si] is Core.Models.Polygon polygon)
+                {
+                    var vertices = polygon.GetTransformedVertices();
+                    for (int i = 0; i < vertices.Count; i++)
+                    {
+                        var v = vertices[i];
+                        if (Math.Abs(v.X - _startPoint.X) <= 6 && Math.Abs(v.Y - _startPoint.Y) <= 6)
+                        {
+                            ViewModel.SelectedShape = polygon;
+                            _selectedShape = polygon;
+                            _selectedShape.IsSelected = true;
+                            _activePolygonVertexIndex = i;
+                            _isDragging = true;
+                            _lastDragPoint = _startPoint;
+                            RenderShapes();
+                            return;
+                        }
+                    }
+                }
+            }
         }
 
         // If Select tool: prefer grabbing a Bezier control point if near cursor (even if not selected yet)
@@ -182,6 +238,20 @@ public partial class CanvasView : UserControl
 
         var currentPoint = e.GetPosition(_drawingCanvas);
 
+        // Dragging Polygon vertex live
+        if (_isDragging && _selectedShape is Core.Models.Polygon polygon && _activePolygonVertexIndex >= 0)
+        {
+            // Move vertex directly (we need to bake transform first if present)
+            if (polygon.Transform != Matrix3x3.Identity)
+            {
+                polygon.BakeTransform();
+            }
+            polygon.Vertices[_activePolygonVertexIndex] = new Point2D(currentPoint.X, currentPoint.Y);
+            _lastDragPoint = currentPoint;
+            RenderShapes();
+            return;
+        }
+
         // Dragging Bezier control point live
         if (_isDragging && _selectedShape is BezierCurve bez && _activeBezierControlPointIndex >= 0)
         {
@@ -225,6 +295,15 @@ public partial class CanvasView : UserControl
     private void DrawingCanvas_OnPointerReleased(object? sender, PointerReleasedEventArgs e)
     {
         if (ViewModel == null || _drawingCanvas == null) return;
+
+        // If finishing dragging a Polygon vertex
+        if (_isDragging && _selectedShape is Core.Models.Polygon && _activePolygonVertexIndex >= 0)
+        {
+            _isDragging = false;
+            _activePolygonVertexIndex = -1;
+            ViewModel.UpdateParametersFromSelectedShape();
+            return;
+        }
 
         // If finishing dragging a Bezier control point
         if (_isDragging && _selectedShape is BezierCurve && _activeBezierControlPointIndex >= 0)
@@ -442,10 +521,72 @@ public partial class CanvasView : UserControl
                     }
                 }
             }
+            else if (shape is Core.Models.Polygon polygon)
+            {
+                var vertices = polygon.GetTransformedVertices();
+                if (vertices.Count >= 2)
+                {
+                    // Create a path geometry for the polygon
+                    var pathFigure = new PathFigure
+                    {
+                        StartPoint = new Avalonia.Point(vertices[0].X, vertices[0].Y),
+                        IsClosed = polygon.IsClosed
+                    };
+
+                    for (int i = 1; i < vertices.Count; i++)
+                    {
+                        pathFigure.Segments!.Add(new LineSegment { Point = new Avalonia.Point(vertices[i].X, vertices[i].Y) });
+                    }
+
+                    var pathGeometry = new PathGeometry();
+                    pathGeometry.Figures!.Add(pathFigure);
+
+                    var path = new Path
+                    {
+                        Data = pathGeometry,
+                        Stroke = new SolidColorBrush(Color.FromUInt32(polygon.StrokeColor)),
+                        Fill = polygon.FillColor.HasValue ? new SolidColorBrush(Color.FromUInt32(polygon.FillColor.Value)) : null,
+                        StrokeThickness = polygon.IsSelected ? polygon.StrokeThickness + 1 : polygon.StrokeThickness
+                    };
+                    _drawingCanvas.Children.Add(path);
+
+                    // Draw selection highlight
+                    if (polygon.IsSelected)
+                    {
+                        var highlightPath = new Path
+                        {
+                            Data = pathGeometry,
+                            Stroke = Brushes.Blue,
+                            StrokeThickness = polygon.StrokeThickness + 3,
+                            Opacity = 0.3,
+                            Fill = null
+                        };
+                        _drawingCanvas.Children.Insert(_drawingCanvas.Children.Count - 1, highlightPath);
+
+                        // Draw vertex handles
+                        const double r = 4;
+                        for (int i = 0; i < vertices.Count; i++)
+                        {
+                            var v = vertices[i];
+                            var dot = new Ellipse
+                            {
+                                Width = r * 2,
+                                Height = r * 2,
+                                Fill = Brushes.White,
+                                Stroke = Brushes.Blue,
+                                StrokeThickness = 2
+                            };
+                            Canvas.SetLeft(dot, v.X - r);
+                            Canvas.SetTop(dot, v.Y - r);
+                            _drawingCanvas.Children.Add(dot);
+                        }
+                    }
+                }
+            }
         }
         
-        // Resize handles for non-Bezier shapes
-        if (_selectedShape != null && _selectedShape is not BezierCurve)
+        // Resize handles for non-Bezier and non-Polygon shapes
+        if (_selectedShape != null && _selectedShape is not BezierCurve && _selectedShape is not Core.Models.Polygon)
         {
             DrawResizeHandles(_selectedShape);
         }

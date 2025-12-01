@@ -92,6 +92,29 @@ public partial class CanvasViewModel : ViewModelBase
     [ObservableProperty]
     private string _bezierPointsText = "100,100; 150,50; 250,150; 300,100";
 
+    // Polygon parameters
+    [ObservableProperty]
+    private string _polygonVerticesText = "100,100; 200,100; 200,200; 100,200";
+
+    // Transformation parameters
+    [ObservableProperty]
+    private string _translateX = "0";
+
+    [ObservableProperty]
+    private string _translateY = "0";
+
+    [ObservableProperty]
+    private string _pivotX = "0";
+
+    [ObservableProperty]
+    private string _pivotY = "0";
+
+    [ObservableProperty]
+    private string _rotationAngle = "45"; // degrees
+
+    [ObservableProperty]
+    private string _scaleFactor = "1.5";
+
     // Mouse interaction state
     private Point2D? _drawingStartPoint;
     private IShape? _tempShape;
@@ -181,12 +204,35 @@ public partial class CanvasViewModel : ViewModelBase
             CurrentFillColor = null;
             HasFill = false;
         }
+        else if (value is Polygon polygon)
+        {
+            var vertices = polygon.GetTransformedVertices();
+            PolygonVerticesText = string.Join("; ", vertices.Select(p => string.Format(System.Globalization.CultureInfo.InvariantCulture, "{0:F1},{1:F1}", p.X, p.Y)));
+            CurrentStrokeColor = polygon.StrokeColor;
+            CurrentStrokeThickness = polygon.StrokeThickness;
+            CurrentFillColor = polygon.FillColor;
+            HasFill = polygon.FillColor.HasValue;
+            
+            // Set pivot to centroid by default
+            var centroid = polygon.Centroid;
+            PivotX = centroid.X.ToString("F1");
+            PivotY = centroid.Y.ToString("F1");
+        }
+
+        // Update pivot to center of bounds for any shape
+        if (value != null)
+        {
+            var bounds = value.GetBounds();
+            PivotX = (bounds.X + bounds.Width / 2).ToString("F1");
+            PivotY = (bounds.Y + bounds.Height / 2).ToString("F1");
+        }
         
         // Notify properties for visibility
         OnPropertyChanged(nameof(IsLineSelected));
         OnPropertyChanged(nameof(IsRectangleSelected));
         OnPropertyChanged(nameof(IsCircleSelected));
         OnPropertyChanged(nameof(IsBezierSelected));
+        OnPropertyChanged(nameof(IsPolygonSelected));
     }
     
     // Properties to control visibility of parameter sections
@@ -194,6 +240,7 @@ public partial class CanvasViewModel : ViewModelBase
     public bool IsRectangleSelected => SelectedShape is Core.Models.Rectangle || SelectedShape == null;
     public bool IsCircleSelected => SelectedShape is Circle || SelectedShape == null;
     public bool IsBezierSelected => SelectedShape is BezierCurve || SelectedShape == null;
+    public bool IsPolygonSelected => SelectedShape is Polygon || SelectedShape == null;
 
     [RelayCommand]
     private void AddLineFromParams()
@@ -274,6 +321,116 @@ public partial class CanvasViewModel : ViewModelBase
         };
         _shapeService.AddShape(curve);
         StatusMessage = $"Added Bezier deg {curve.Degree} with {curve.ControlPoints.Count} pts";
+    }
+
+    [RelayCommand]
+    private void AddPolygonFromParams()
+    {
+        var vertices = ParsePolygonVertices(PolygonVerticesText);
+        if (vertices.Count < 3)
+        {
+            StatusMessage = "Polygon requires at least 3 vertices";
+            return;
+        }
+        var polygon = new Polygon(vertices)
+        {
+            StrokeColor = CurrentStrokeColor,
+            FillColor = CurrentFillColor,
+            StrokeThickness = CurrentStrokeThickness
+        };
+        _shapeService.AddShape(polygon);
+        StatusMessage = $"Added {polygon}";
+    }
+
+    [RelayCommand]
+    private void ApplyTranslation()
+    {
+        if (SelectedShape == null)
+        {
+            StatusMessage = "No shape selected";
+            return;
+        }
+
+        if (TryParse(TranslateX, out double tx) && TryParse(TranslateY, out double ty))
+        {
+            _shapeService.TranslateSelectedShape(tx, ty);
+            UpdateParametersFromSelectedShape();
+            OnPropertyChanged(nameof(Shapes));
+            StatusMessage = $"Translated by ({tx:F1}, {ty:F1})";
+        }
+        else
+        {
+            StatusMessage = "Invalid translation values";
+        }
+    }
+
+    [RelayCommand]
+    private void ApplyRotation()
+    {
+        if (SelectedShape == null)
+        {
+            StatusMessage = "No shape selected";
+            return;
+        }
+
+        if (TryParse(PivotX, out double px) && TryParse(PivotY, out double py) &&
+            TryParse(RotationAngle, out double angle))
+        {
+            var pivot = new Point2D(px, py);
+            double angleRadians = angle * Math.PI / 180.0; // Convert degrees to radians
+            _shapeService.RotateSelectedShape(pivot, angleRadians);
+            UpdateParametersFromSelectedShape();
+            OnPropertyChanged(nameof(Shapes));
+            StatusMessage = $"Rotated {angle:F1}° around ({px:F1}, {py:F1})";
+        }
+        else
+        {
+            StatusMessage = "Invalid rotation values";
+        }
+    }
+
+    [RelayCommand]
+    private void ApplyScale()
+    {
+        if (SelectedShape == null)
+        {
+            StatusMessage = "No shape selected";
+            return;
+        }
+
+        if (TryParse(PivotX, out double px) && TryParse(PivotY, out double py) &&
+            TryParse(ScaleFactor, out double scale))
+        {
+            if (scale <= 0)
+            {
+                StatusMessage = "Scale factor must be positive";
+                return;
+            }
+            var pivot = new Point2D(px, py);
+            _shapeService.ScaleSelectedShape(pivot, scale);
+            UpdateParametersFromSelectedShape();
+            OnPropertyChanged(nameof(Shapes));
+            StatusMessage = $"Scaled by {scale:F2}x around ({px:F1}, {py:F1})";
+        }
+        else
+        {
+            StatusMessage = "Invalid scale values";
+        }
+    }
+
+    [RelayCommand]
+    private void SetPivotToCenter()
+    {
+        if (SelectedShape == null)
+        {
+            StatusMessage = "No shape selected";
+            return;
+        }
+
+        var bounds = SelectedShape.GetBounds();
+        PivotX = (bounds.X + bounds.Width / 2).ToString("F1");
+        PivotY = (bounds.Y + bounds.Height / 2).ToString("F1");
+        StatusMessage = "Pivot set to shape center";
     }
 
     [RelayCommand]
@@ -457,6 +614,20 @@ public partial class CanvasViewModel : ViewModelBase
                 OnPropertyChanged(nameof(Shapes));
                 StatusMessage = "Bezier updated";
             }
+            else if (SelectedShape is Polygon polygon)
+            {
+                var vertices = ParsePolygonVertices(PolygonVerticesText);
+                if (vertices.Count < 3)
+                {
+                    StatusMessage = "Polygon requires at least 3 vertices";
+                    return;
+                }
+                polygon.Vertices.Clear();
+                foreach (var v in vertices) polygon.Vertices.Add(v);
+                polygon.ResetTransform(); // Reset transform since we're setting new vertices
+                OnPropertyChanged(nameof(Shapes));
+                StatusMessage = "Polygon updated";
+            }
         }
         catch (Exception ex)
         {
@@ -500,6 +671,22 @@ public partial class CanvasViewModel : ViewModelBase
             }
             ((BezierCurve)_tempShape).AddPoint(point);
             StatusMessage = $"Added control point ({x:F1},{y:F1})";
+            return;
+        }
+        else if (SelectedTool == DrawingTool.Polygon)
+        {
+            // Start new polygon if none is being constructed
+            if (_tempShape is not Polygon tempPolygon)
+            {
+                tempPolygon = new Polygon();
+                tempPolygon.StrokeColor = CurrentStrokeColor;
+                tempPolygon.FillColor = CurrentFillColor;
+                tempPolygon.StrokeThickness = CurrentStrokeThickness;
+                _tempShape = tempPolygon;
+                _shapeService.AddShape(tempPolygon);
+            }
+            ((Polygon)_tempShape).AddVertex(point);
+            StatusMessage = $"Added vertex ({x:F1},{y:F1}) - Click more or 'Finish Polygon' when done";
             return;
         }
         else
@@ -559,6 +746,12 @@ public partial class CanvasViewModel : ViewModelBase
         if (SelectedTool == DrawingTool.Bezier)
         {
             // Keep the newly added point; user keeps clicking to add more. End with right click or tool change.
+            return;
+        }
+
+        if (SelectedTool == DrawingTool.Polygon)
+        {
+            // Keep the newly added vertex; user keeps clicking to add more. End with FinishPolygon command.
             return;
         }
 
@@ -646,6 +839,19 @@ public partial class CanvasViewModel : ViewModelBase
             BezierDegree = Math.Max(0, bez.Degree);
             BezierPointsText = string.Join("; ", bez.ControlPoints.Select(p => string.Format(System.Globalization.CultureInfo.InvariantCulture, "{0:F1},{1:F1}", p.X, p.Y)));
         }
+        else if (SelectedShape is Polygon polygon)
+        {
+            var vertices = polygon.GetTransformedVertices();
+            PolygonVerticesText = string.Join("; ", vertices.Select(p => string.Format(System.Globalization.CultureInfo.InvariantCulture, "{0:F1},{1:F1}", p.X, p.Y)));
+        }
+
+        // Update pivot to center of bounds
+        if (SelectedShape != null)
+        {
+            var bounds = SelectedShape.GetBounds();
+            PivotX = (bounds.X + bounds.Width / 2).ToString("F1");
+            PivotY = (bounds.Y + bounds.Height / 2).ToString("F1");
+        }
     }
 
     [RelayCommand]
@@ -687,6 +893,50 @@ public partial class CanvasViewModel : ViewModelBase
         }
         return result;
     }
+
+    private List<Point2D> ParsePolygonVertices(string text)
+    {
+        var result = new List<Point2D>();
+        if (string.IsNullOrWhiteSpace(text)) return result;
+        var parts = text.Split(new[] { ';' }, StringSplitOptions.RemoveEmptyEntries);
+        foreach (var part in parts)
+        {
+            var xy = part.Trim().Split(',');
+            if (xy.Length == 2 
+                && double.TryParse(xy[0], System.Globalization.NumberFormatInfo.InvariantInfo, out double x) 
+                && double.TryParse(xy[1], System.Globalization.NumberFormatInfo.InvariantInfo, out double y))
+            {
+                result.Add(new Point2D(x, y));
+            }
+        }
+        return result;
+    }
+
+    // Event to request finishing polygon from view
+    public event Action? FinishPolygonRequested;
+
+    [RelayCommand]
+    private void FinishPolygon()
+    {
+        if (_tempShape is Polygon temp)
+        {
+            if (temp.Vertices.Count >= 3)
+            {
+                _tempShape = null;
+                StatusMessage = $"Polygon created with {temp.VertexCount} vertices";
+                SelectedShape = temp;
+            }
+            else
+            {
+                StatusMessage = $"Polygon requires at least 3 vertices (currently {temp.VertexCount})";
+            }
+        }
+        else
+        {
+            StatusMessage = "No active Polygon to finish";
+        }
+        FinishPolygonRequested?.Invoke();
+    }
 }
 
 public enum DrawingTool
@@ -695,5 +945,6 @@ public enum DrawingTool
     Line,
     Rectangle,
     Circle,
-    Bezier // new
+    Bezier,
+    Polygon
 }

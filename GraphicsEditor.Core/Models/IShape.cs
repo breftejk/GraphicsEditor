@@ -10,7 +10,8 @@ namespace GraphicsEditor.Core.Models;
 [JsonDerivedType(typeof(Line), typeDiscriminator: "line")]
 [JsonDerivedType(typeof(Rectangle), typeDiscriminator: "rectangle")]
 [JsonDerivedType(typeof(Circle), typeDiscriminator: "circle")]
-[JsonDerivedType(typeof(BezierCurve), typeDiscriminator: "bezier")] // added
+[JsonDerivedType(typeof(BezierCurve), typeDiscriminator: "bezier")]
+[JsonDerivedType(typeof(Polygon), typeDiscriminator: "polygon")]
 public interface IShape : ICloneable
 {
     /// <summary>

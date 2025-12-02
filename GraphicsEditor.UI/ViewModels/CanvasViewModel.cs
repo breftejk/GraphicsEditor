@@ -156,6 +156,9 @@ public partial class CanvasViewModel : ViewModelBase
 
     partial void OnSelectedShapeChanged(IShape? value)
     {
+        // Synchronize with ShapeService to ensure transformations work correctly
+        _shapeService.SelectShape(value);
+        
         // Load selected shape's parameters into text fields
         if (value is Line line)
         {
